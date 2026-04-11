@@ -359,6 +359,8 @@ Located at `metro.config.js`. Standard Expo Metro config with SVG transformer su
 
 Primary storage is **on-device** (`@react-native-async-storage/async-storage`). The monorepo also includes **`artifacts/api-server`** with `/api/coach` (OpenAI proxy) and `/api/scans` (Postgres when `DATABASE_URL` is set, otherwise in-memory for local dev). The app does not sync automatically yet — see `NATIVE_ROADMAP.md`.
 
+**Local Postgres (Docker):** from the monorepo root, run `pnpm run db:up`, copy `artifacts/api-server/.env.example` → `artifacts/api-server/.env`, then `pnpm run db:push`. Start the API with `pnpm --filter @workspace/api-server run dev` (or `build` + `start` with `PORT` set).
+
 ### `AppContext` (`context/AppContext.tsx`)
 
 The global context exposes profile, scan history, chat, `scanDataSource` (`empty` | `live` | `demo` | `legacy_demo`), and helpers such as `loadDemoScanHistory()`.
