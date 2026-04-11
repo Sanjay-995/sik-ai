@@ -22,7 +22,7 @@
 
 ## Overview
 
-Sik AI is a fully dark-themed iOS fitness application that simulates a LiDAR body scanner, tracks 11 body measurements, visualizes weekly progress, and provides an AI coaching interface. All data is stored locally using AsyncStorage — no backend or account required.
+Sik AI is a fully dark-themed iOS fitness application with a **demo body-scan flow** (no real LiDAR or depth camera), illustrative measurements, and optional **live coaching** when you point the app at a running `api-server` with `OPENAI_API_KEY`. Scan history defaults to **empty**; you can load labeled demo data from Settings for UI review. On-device data still uses AsyncStorage until sync is wired.
 
 | | |
 |---|---|
@@ -54,7 +54,7 @@ Sik AI is a fully dark-themed iOS fitness application that simulates a LiDAR bod
 
 ### Dashboard & Analytics
 - Fitness score ring (0–100) with animated arc
-- 8 weeks of **seeded mock data** for immediate visual richness
+- **Optional** 8 weeks of labeled demo history (Settings → Data) for chart QA — not auto-seeded as real user data
 - Weekly trend chart per measurement
 - Before/After **comparison view** with side-by-side body diagrams
 
@@ -357,24 +357,15 @@ Located at `metro.config.js`. Standard Expo Metro config with SVG transformer su
 
 ## Data & Persistence
 
-All data is stored **100% on-device** using `@react-native-async-storage/async-storage`. There is no backend, no API, and no account required.
+Primary storage is **on-device** (`@react-native-async-storage/async-storage`). The monorepo also includes **`artifacts/api-server`** with `/api/coach` (OpenAI proxy) and `/api/scans` (Postgres when `DATABASE_URL` is set, otherwise in-memory for local dev). The app does not sync automatically yet — see `NATIVE_ROADMAP.md`.
 
 ### `AppContext` (`context/AppContext.tsx`)
 
-The single global context provider wraps the entire app and exposes:
+The global context exposes profile, scan history, chat, `scanDataSource` (`empty` | `live` | `demo` | `legacy_demo`), and helpers such as `loadDemoScanHistory()`.
 
-```ts
-{
-  scans: Scan[];              // All past scans, sorted newest-first
-  addScan: (s: Scan) => void; // Save a new scan + persist to AsyncStorage
-  latestScan: Scan | null;    // Most recent scan (or null)
-  weeklyData: WeeklyData[];   // 8 weeks of trend data per measurement
-}
-```
+### Demo vs live data
 
-### Seeded mock data
-
-On first launch, `AppContext` seeds **8 weeks of realistic scan data** so every chart and history screen shows meaningful content immediately — no real scanning needed to evaluate the UI.
+Charts treat **demo** and **legacy_demo** sources as synthetic (banner on the dashboard). Saving a real scan from the demo flow clears demo rows and marks the source **live**.
 
 ### Scan data shape
 

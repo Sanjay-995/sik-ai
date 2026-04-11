@@ -57,7 +57,7 @@ function SettingRow({ icon, label, value, onPress, toggle, toggleValue, onToggle
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile } = useApp();
+  const { profile, updateProfile, loadDemoScanHistory, scanDataSource } = useApp();
   const [notifications, setNotifications] = useState(true);
   const [weeklyReminder, setWeeklyReminder] = useState(true);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -74,6 +74,21 @@ export default function SettingsScreen() {
   async function saveName() {
     await updateProfile({ name: editName });
     setIsEditingName(false);
+  }
+
+  function confirmLoadDemoCharts() {
+    Alert.alert(
+      "Load labeled demo data?",
+      "This replaces your current scan list with 8 weeks of clearly marked sample data for UI testing. It is not real measurements.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Load demo",
+          style: "destructive",
+          onPress: () => void loadDemoScanHistory(),
+        },
+      ],
+    );
   }
 
   return (
@@ -178,6 +193,19 @@ export default function SettingsScreen() {
             toggle
             toggleValue={weeklyReminder}
             onToggle={setWeeklyReminder}
+          />
+        </View>
+      </View>
+
+      {/* Data truthfulness */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Data</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SettingRow
+            icon="database"
+            label="Load demo scan history"
+            value={scanDataSource === "demo" ? "Active" : ""}
+            onPress={confirmLoadDemoCharts}
           />
         </View>
       </View>

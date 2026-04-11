@@ -159,8 +159,6 @@ export function LiDARScanner({ isScanning, isIdle, progress, phase }: LiDARScann
   const [liveReadout, setLiveReadout] = React.useState('0000.00');
   const [depthValue,  setDepthValue]  = React.useState('0.000m');
   const [signalBars,  setSignalBars]  = React.useState(0);
-  const readoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // ── Point cloud: derive visible dots directly from progress prop ──
   // revealedY is the Y threshold in body-local coords (0–358)
   const revealedY = isScanning
@@ -213,18 +211,15 @@ export function LiDARScanner({ isScanning, isIdle, progress, phase }: LiDARScann
         ]).start();
       });
 
-      // HUD data ticker
-      readoutRef.current = setInterval(() => {
-        setLiveReadout((Math.random() * 9999).toFixed(2).padStart(7, '0'));
-        setDepthValue(`${(Math.random() * 1.8 + 0.5).toFixed(3)}m`);
-        setSignalBars(Math.floor(Math.random() * 2) + 3);
-      }, 110);
+      // HUD: static demo labels (no random “sensor” theatrics)
+      setLiveReadout('DEMO·VIZ');
+      setDepthValue('n/a');
+      setSignalBars(4);
 
       return () => {
         sweep.stop();
         bracketLoop.stop();
         flickerLoop.stop();
-        if (readoutRef.current) clearInterval(readoutRef.current);
         scanLineOp.setValue(0);
         scanLineY.setValue(0);
         gridFade.setValue(0);
@@ -437,7 +432,7 @@ export function LiDARScanner({ isScanning, isIdle, progress, phase }: LiDARScann
               }]} />
             ))}
           </View>
-          <Text style={styles.hudValSm}>LiDAR ON</Text>
+          <Text style={styles.hudValSm}>DEMO MODE</Text>
         </Animated.View>
       )}
 

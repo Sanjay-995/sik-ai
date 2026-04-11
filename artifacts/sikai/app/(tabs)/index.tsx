@@ -17,7 +17,7 @@ const { width } = Dimensions.get('window');
 export default function DashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { profile, latestScan, previousScan } = useApp();
+  const { profile, latestScan, previousScan, scanDataSource } = useApp();
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>('waist');
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -52,6 +52,36 @@ export default function DashboardScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {(scanDataSource === "demo" || scanDataSource === "legacy_demo") && (
+        <View
+          style={[
+            styles.dataBanner,
+            {
+              backgroundColor:
+                scanDataSource === "legacy_demo" ? "rgba(239,68,68,0.12)" : "rgba(251,191,36,0.12)",
+              borderColor:
+                scanDataSource === "legacy_demo" ? "rgba(239,68,68,0.35)" : "rgba(251,191,36,0.35)",
+            },
+          ]}
+        >
+          <Feather
+            name="alert-triangle"
+            size={16}
+            color={scanDataSource === "legacy_demo" ? colors.destructive : "#fbbf24"}
+          />
+          <Text
+            style={[
+              styles.dataBannerText,
+              { color: scanDataSource === "legacy_demo" ? colors.destructive : "#fcd34d" },
+            ]}
+          >
+            {scanDataSource === "legacy_demo"
+              ? "Older installs used auto-generated sample scans. Reset data in Settings or load explicit demo data — charts are not real measurements."
+              : "Sample / demo scan history — for UI preview only, not real body data."}
+          </Text>
+        </View>
+      )}
 
       {/* Score + Body Diagram */}
       <View style={[styles.mainCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -200,6 +230,17 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  dataBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  dataBannerText: { flex: 1, fontSize: 12, fontWeight: "600", lineHeight: 17 },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 16,

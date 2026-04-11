@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
-  Platform, KeyboardAvoidingView, ActivityIndicator
+  Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
+import { fetchCoachReply } from '@/lib/coachClient';
 
 interface Message {
   id: string;
@@ -19,32 +20,44 @@ interface Message {
 const WELCOME_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
-  content: "Hi! I'm your Sik AI fitness coach. I can help you analyze your body scans, create personalized workout plans, and guide your nutrition. What would you like to know?",
+  content:
+    "Hi — live answers use the Sik AI API (OpenAI on the server) when EXPO_PUBLIC_API_BASE_URL and OPENAI_API_KEY are set. Otherwise you’ll see short offline tips only. This is not medical advice.",
   timestamp: new Date().toISOString(),
 };
 
 const AI_RESPONSES: Record<string, string> = {
-  default: "Based on your recent scans, you're making excellent progress! Your body fat has decreased by 2.5% over the past 8 weeks while muscle mass increased by 2kg. Keep up the consistent training!",
-  weight: "Your weight trend shows healthy, sustainable progress. You've lost approximately 3kg over 8 weeks. Focus on maintaining protein intake (aim for 1.6-2.2g per kg bodyweight) to preserve your muscle gains.",
-  waist: "Your waist measurement has decreased by 2.5cm this month — great progress! This reduction typically correlates with improved metabolic health. Core-focused exercises like planks and deadlifts will accelerate this further.",
-  muscle: "Your muscle mass has increased by 2kg over 8 weeks, which is excellent. Ensure you're progressively overloading your workouts and sleeping 7-9 hours for optimal recovery and muscle synthesis.",
-  workout: "Based on your goal to build muscle, I recommend a 4-day push/pull split: Day 1 (Push): Bench Press, OHP, Tricep Dips. Day 2 (Pull): Deadlifts, Pull-ups, Rows. Day 3: Rest. Day 4: Legs. Day 5: Upper body hypertrophy. Days 6-7: Rest.",
-  nutrition: "For muscle building with your current stats, target: 3,000-3,200 calories/day, 160g protein, 350g carbs, 90g fat. Prioritize protein in every meal. Pre-workout: fast-digesting carbs. Post-workout: protein + carbs within 30 mins.",
-  scan: "Your latest body scan score of 85 is excellent! Your symmetry measurements look great — left/right arm difference is only 0.5cm. I'd focus on increasing shoulder width through lateral raises to improve your V-taper.",
-  chest: "Your chest is at 97cm. For a powerful chest, focus on: Flat bench press (4x6-8), Incline DB press (3x10-12), Cable flys (3x12-15), Dips (3x failure). Progressive overload is key.",
-  body: "Your body composition analysis shows you're in excellent shape for muscle building. Body fat at 16.5% is ideal — this range allows muscle building while keeping fat gains minimal. Your physique score puts you in the top 25% of users.",
+  default:
+    "Offline tip: consistency beats intensity. Aim for 2–4 strength sessions per week plus daily walking if you can. Connect the API for tailored coaching.",
+  weight:
+    "Offline tip: track trend over weeks, not days. Pair the scale with waist measurement and how clothes fit. Connect the API for personalized targets.",
+  waist:
+    "Offline tip: core work supports posture; fat loss still comes mostly from overall energy balance and protein. Connect the API for a structured plan.",
+  muscle:
+    "Offline tip: progressive overload + enough protein (roughly 1.6–2.2 g/kg/day for many lifters) + sleep. Connect the API for programming details.",
+  workout:
+    "Offline tip: full-body 2–3×/week or upper/lower 4×/week are simple starters. Connect the API for a split matched to your equipment.",
+  nutrition:
+    "Offline tip: build meals around protein and vegetables; adjust carbs to training days. Connect the API for numbers tied to your goals.",
+  scan:
+    "Offline tip: treat any in-app scan numbers as illustrative until you use calibrated hardware. Connect the API to discuss trends safely.",
+  chest:
+    "Offline tip: horizontal press + incline + fly pattern + triceps work. Connect the API for sets/reps suggestions.",
+  body:
+    "Offline tip: recovery and adherence matter more than chasing perfect metrics. Connect the API for deeper guidance.",
 };
 
 function getAIResponse(message: string): string {
   const lower = message.toLowerCase();
-  if (lower.includes('weight')) return AI_RESPONSES.weight;
-  if (lower.includes('waist') || lower.includes('belly')) return AI_RESPONSES.waist;
-  if (lower.includes('muscle') || lower.includes('mass')) return AI_RESPONSES.muscle;
-  if (lower.includes('workout') || lower.includes('exercise') || lower.includes('training')) return AI_RESPONSES.workout;
-  if (lower.includes('nutrition') || lower.includes('diet') || lower.includes('food') || lower.includes('eat')) return AI_RESPONSES.nutrition;
-  if (lower.includes('scan') || lower.includes('score')) return AI_RESPONSES.scan;
-  if (lower.includes('chest')) return AI_RESPONSES.chest;
-  if (lower.includes('body') || lower.includes('composition')) return AI_RESPONSES.body;
+  if (lower.includes("weight")) return AI_RESPONSES.weight;
+  if (lower.includes("waist") || lower.includes("belly")) return AI_RESPONSES.waist;
+  if (lower.includes("muscle") || lower.includes("mass")) return AI_RESPONSES.muscle;
+  if (lower.includes("workout") || lower.includes("exercise") || lower.includes("training"))
+    return AI_RESPONSES.workout;
+  if (lower.includes("nutrition") || lower.includes("diet") || lower.includes("food") || lower.includes("eat"))
+    return AI_RESPONSES.nutrition;
+  if (lower.includes("scan") || lower.includes("score")) return AI_RESPONSES.scan;
+  if (lower.includes("chest")) return AI_RESPONSES.chest;
+  if (lower.includes("body") || lower.includes("composition")) return AI_RESPONSES.body;
   return AI_RESPONSES.default;
 }
 
@@ -78,18 +91,48 @@ export default function CoachScreen() {
     await addChatMessage(userMsg);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsTyping(true);
+    try {
+      const transcript = [...chatMessages, userMsg];
+      const messages = transcript.slice(-20).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
 
-    setTimeout(async () => {
+      const latestScanSummary = latestScan
+        ? `Score ${latestScan.score}; body fat ${latestScan.measurements.bodyFat.toFixed(1)}%; weight ${latestScan.weight}kg. Treat as demo unless you saved a real reference scan.`
+        : "No saved scan yet.";
+
+      const api = await fetchCoachReply({
+        messages,
+        context: {
+          displayName: profile.name.split(" ")[0],
+          heightCm: profile.height,
+          weightKg: profile.weight,
+          goal: profile.goal,
+          latestScanSummary,
+        },
+      });
+
+      const fallback = getAIResponse(userMsg.content);
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: getAIResponse(userMsg.content),
+        role: "assistant",
+        content: api.ok ? api.reply : `${fallback}\n\n—\n${api.message}`,
         timestamp: new Date().toISOString(),
       };
       await addChatMessage(aiResponse);
-      setIsTyping(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, 1200 + Math.random() * 600);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      await addChatMessage({
+        id: (Date.now() + 2).toString(),
+        role: "assistant",
+        content: `${getAIResponse(userMsg.content)}\n\n—\nCoach error: ${msg}`,
+        timestamp: new Date().toISOString(),
+      });
+    } finally {
+      setIsTyping(false);
+    }
   }
 
   const QUICK_QUESTIONS = [
@@ -134,7 +177,7 @@ export default function CoachScreen() {
           </View>
           <View>
             <Text style={[styles.coachName, { color: colors.foreground }]}>Sik AI Coach</Text>
-            <Text style={[styles.coachStatus, { color: colors.emerald }]}>Online · Ready</Text>
+            <Text style={[styles.coachStatus, { color: colors.emerald }]}>API when configured</Text>
           </View>
         </View>
         <TouchableOpacity onPress={clearChat} style={styles.clearBtn}>

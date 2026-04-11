@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
+import { requestProSubscription } from '@/services/purchases';
 
 const PLANS = [
   {
@@ -64,14 +65,16 @@ export default function PaywallScreen() {
   async function handleSubscribe() {
     setIsLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    // Simulated purchase flow
-    setTimeout(async () => {
-      await updateProfile({ isPro: true });
+    try {
+      const ok = await requestProSubscription(selectedPlan);
+      if (ok) {
+        await updateProfile({ isPro: true });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      }
+    } finally {
       setIsLoading(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-    }, 1500);
+    }
   }
 
   if (profile.isPro) {
@@ -123,7 +126,7 @@ export default function PaywallScreen() {
           Unlock{'\n'}Sik AI Pro
         </Text>
         <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-          Transform your body with AI-powered precision scanning and personalized coaching.
+          Pro features are planned for when StoreKit billing is integrated. This screen previews pricing only.
         </Text>
       </View>
 
@@ -208,7 +211,7 @@ export default function PaywallScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.legalText, { color: colors.textTertiary }]}>
-          Cancel anytime. Billed through App Store. By subscribing, you agree to our Terms of Service and Privacy Policy.
+          App Store billing is not active in this build. When subscriptions launch, Apple’s standard terms and restore purchases will apply.
         </Text>
 
         <TouchableOpacity onPress={() => router.back()} style={styles.skipPaywall}>

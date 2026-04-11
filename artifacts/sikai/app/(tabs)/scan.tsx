@@ -11,43 +11,37 @@ import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
 import { LiDARScanner } from '@/components/LiDARScanner';
 import { ScanRecord, BodyMeasurement } from '@/context/AppContext';
+import { buildProfileBasedDemoScan } from '@/lib/scanSimulation';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 const SCAN_PHASES = [
-  'Initializing LiDAR sensors...',
-  'Calibrating depth camera...',
-  'Mapping body surface...',
-  'Capturing point cloud data...',
-  'Measuring chest & shoulders...',
-  'Measuring waist & hips...',
-  'Measuring arms & thighs...',
-  'Analyzing body composition...',
-  'Processing scan data...',
-  'Calculating AI score...',
-  'Finalizing measurements...',
-  'Scan complete!',
+  'Preparing demo flow…',
+  'Playing visualization…',
+  'Mapping illustrative mesh…',
+  'Sweeping preview point cloud…',
+  'Deriving demo chest & shoulders…',
+  'Deriving demo waist & hips…',
+  'Deriving demo arms & thighs…',
+  'Estimating composition (demo)…',
+  'Stabilizing demo numbers…',
+  'Computing illustrative score…',
+  'Finishing…',
+  'Demo pass complete',
 ];
 
-function generateScanResult(): Omit<ScanRecord, 'id' | 'date'> {
-  const j = (b: number, r: number) => parseFloat((b + (Math.random() - 0.5) * r).toFixed(1));
-  const measurements: BodyMeasurement = {
-    chest: j(97, 3),
-    waist: j(82, 4),
-    hips: j(96, 3),
-    leftArm: j(36, 2),
-    rightArm: j(36.5, 2),
-    leftThigh: j(59, 3),
-    rightThigh: j(58.5, 3),
-    neck: j(38.5, 1.5),
-    shoulders: j(123, 3),
-    bodyFat: j(16.5, 2),
-    muscleMass: j(43, 2),
+function buildScanResult(
+  profile: { height: number; weight: number; gender: 'male' | 'female'; age: number },
+  liveScanCount: number,
+): Omit<ScanRecord, 'id' | 'date'> {
+  const sim = buildProfileBasedDemoScan(profile, liveScanCount);
+  const measurements: BodyMeasurement = { ...sim.measurements };
+  return {
+    measurements,
+    weight: sim.weight,
+    bmi: sim.bmi,
+    score: sim.score,
   };
-  const weight = j(80, 2);
-  const bmi = parseFloat((weight / (1.78 * 1.78)).toFixed(1));
-  const score = Math.floor(78 + Math.random() * 12);
-  return { measurements, weight, bmi, score };
 }
 
 // Animated counter for result numbers
@@ -81,7 +75,8 @@ function AnimatedNumber({ value, unit, duration = 800 }: { value: number; unit?:
 export default function ScanScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { addScan } = useApp();
+  const { addScan, profile, scanHistory } = useApp();
+  const liveScanCount = scanHistory.filter((s) => !s.id.startsWith('demo_')).length;
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'complete'>('idle');
   const [progress, setProgress] = useState(0);
   const [phaseIndex, setPhaseIndex] = useState(0);
@@ -132,7 +127,7 @@ export default function ScanScreen() {
     clearInterval(progressRef.current!);
     clearInterval(phaseRef.current!);
     setPhaseIndex(SCAN_PHASES.length - 1);
-    const scanResult = generateScanResult();
+    const scanResult = buildScanResult(profile, liveScanCount);
     setResult(scanResult);
     setScanState('complete');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -212,8 +207,8 @@ export default function ScanScreen() {
       {/* Header */}
       <Animated.View style={[styles.header, { paddingTop: topPad + 8, opacity: headerOpacity }]}>
         <View>
-          <Text style={styles.headerTitle}>Body Scan</Text>
-          <Text style={styles.headerSub}>LiDAR · DEPTH SENSING · AI</Text>
+          <Text style={styles.headerTitle}>Body Scan (demo)</Text>
+          <Text style={styles.headerSub}>VISUALIZATION · NOT A REAL SENSOR</Text>
         </View>
         <View style={styles.headerRight}>
           <View style={styles.lidarPill}>
@@ -241,7 +236,7 @@ export default function ScanScreen() {
           <View style={styles.idleInstructions}>
             <Feather name="info" size={13} color="rgba(16,185,129,0.5)" />
             <Text style={styles.idleInstructionText}>
-              Stand 1–2m from device · Keep arms slightly away from body
+              No camera or LiDAR is used — numbers are illustrative from your profile
             </Text>
           </View>
           <TouchableOpacity
@@ -251,7 +246,7 @@ export default function ScanScreen() {
           >
             <View style={styles.startBtnInner}>
               <Feather name="maximize" size={20} color="#fff" />
-              <Text style={styles.startBtnText}>Start LiDAR Scan</Text>
+              <Text style={styles.startBtnText}>Run demo scan</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -291,6 +286,12 @@ export default function ScanScreen() {
 
             {/* Score hero */}
             <View style={styles.scoreHero}>
+              <View style={styles.demoDisclaimer}>
+                <Feather name="alert-circle" size={14} color="rgba(251,191,36,0.95)" />
+                <Text style={styles.demoDisclaimerText}>
+                  Illustrative values only — not medical or metrology data.
+                </Text>
+              </View>
               <View style={[styles.scoreBadge, { borderColor: scoreColor + '50' }]}>
                 <Text style={[styles.scoreNumber, { color: scoreColor }]}>{result.score}</Text>
                 <Text style={styles.scoreLabel}>BODY SCORE</Text>
@@ -536,6 +537,25 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     gap: 14,
+  },
+  demoDisclaimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.25)',
+    width: '100%',
+  },
+  demoDisclaimerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(253,230,138,0.95)',
+    lineHeight: 17,
   },
   scoreBadge: {
     alignItems: 'center',
