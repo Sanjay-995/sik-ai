@@ -152,63 +152,61 @@ Explicitly excluded. Reasons captured to prevent scope creep.
 
 ## Traceability
 
-Empty until ROADMAP.md is generated; the roadmapper populates phase mappings.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SPIKE-01 | TBD | Pending |
-| SPIKE-02 | TBD | Pending |
-| SPIKE-03 | TBD | Pending |
-| SPIKE-04 | TBD | Pending |
-| MEAS-01 | TBD | Pending |
-| MEAS-02 | TBD | Pending |
-| MEAS-03 | TBD | Pending |
-| MEAS-04 | TBD | Pending |
-| MEAS-05 | TBD | Pending |
-| MEAS-06 | TBD | Pending |
-| CAP-01 | TBD | Pending |
-| CAP-02 | TBD | Pending |
-| CAP-03 | TBD | Pending |
-| CAP-04 | TBD | Pending |
-| CAP-05 | TBD | Pending |
-| CAP-06 | TBD | Pending |
-| CAP-07 | TBD | Pending |
-| DATA-01 | TBD | Pending |
-| DATA-02 | TBD | Pending |
-| DATA-03 | TBD | Pending |
-| DATA-04 | TBD | Pending |
-| DATA-05 | TBD | Pending |
-| HIST-01 | TBD | Pending |
-| HIST-02 | TBD | Pending |
-| HIST-03 | TBD | Pending |
-| HIST-04 | TBD | Pending |
-| COACH-01 | TBD | Pending |
-| COACH-02 | TBD | Pending |
-| COACH-03 | TBD | Pending |
-| COACH-04 | TBD | Pending |
-| PAY-01 | TBD | Pending |
-| PAY-02 | TBD | Pending |
-| PAY-03 | TBD | Pending |
-| PAY-04 | TBD | Pending |
-| PAY-05 | TBD | Pending |
-| NOTIF-01 | TBD | Pending |
-| NOTIF-02 | TBD | Pending |
-| NOTIF-03 | TBD | Pending |
-| ONBD-01 | TBD | Pending |
-| ONBD-02 | TBD | Pending |
-| ONBD-03 | TBD | Pending |
-| ONBD-04 | TBD | Pending |
-| PRIV-01 | TBD | Pending |
-| PRIV-02 | TBD | Pending |
-| PRIV-03 | TBD | Pending |
-| DEMO-01 | TBD | Pending |
-| DEMO-02 | TBD | Pending |
+| SPIKE-01 | Phase 1 | Pending |
+| SPIKE-02 | Phase 1 | Pending |
+| SPIKE-03 | Phase 1 | Pending |
+| SPIKE-04 | Phase 1 | Pending |
+| MEAS-01 | Phase 2 | Pending |
+| MEAS-02 | Phase 2 | Pending |
+| MEAS-03 | Phase 2 | Pending |
+| MEAS-04 | Phase 2 | Pending |
+| MEAS-05 | Phase 2 | Pending |
+| MEAS-06 | Phase 2 | Pending |
+| CAP-01 | Phase 3 | Pending |
+| CAP-02 | Phase 3 | Pending |
+| CAP-03 | Phase 3 | Pending |
+| CAP-04 | Phase 3 | Pending |
+| CAP-05 | Phase 3 | Pending |
+| CAP-06 | Phase 3 | Pending |
+| CAP-07 | Phase 3 | Pending |
+| DATA-01 | Phase 2 | Pending |
+| DATA-02 | Phase 2 | Pending |
+| DATA-03 | Phase 2 | Pending |
+| DATA-04 | Phase 2 | Pending |
+| DATA-05 | Phase 2 | Pending |
+| HIST-01 | Phase 3 | Pending |
+| HIST-02 | Phase 3 | Pending |
+| HIST-03 | Phase 3 | Pending |
+| HIST-04 | Phase 3 | Pending |
+| COACH-01 | Phase 4 | Pending |
+| COACH-02 | Phase 4 | Pending |
+| COACH-03 | Phase 4 | Pending |
+| COACH-04 | Phase 4 | Pending |
+| PAY-01 | Phase 4 | Pending |
+| PAY-02 | Phase 4 | Pending |
+| PAY-03 | Phase 4 | Pending |
+| PAY-04 | Phase 4 | Pending |
+| PAY-05 | Phase 4 | Pending |
+| NOTIF-01 | Phase 4 | Pending |
+| NOTIF-02 | Phase 4 | Pending |
+| NOTIF-03 | Phase 4 | Pending |
+| ONBD-01 | Phase 3 | Pending |
+| ONBD-02 | Phase 3 | Pending |
+| ONBD-03 | Phase 3 | Pending |
+| ONBD-04 | Phase 3 | Pending |
+| PRIV-01 | Phase 2 | Pending |
+| PRIV-02 | Phase 2 | Pending |
+| PRIV-03 | Phase 4 | Pending |
+| DEMO-01 | Phase 4 | Pending |
+| DEMO-02 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 47 total
-- Mapped to phases: 0 (pending roadmap creation)
-- Unmapped: 47 ⚠️ (will be 0 after the roadmapper runs)
+- Mapped to phases: 47
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-30*
-*Last updated: 2026-04-30 after initial definition*
+*Last updated: 2026-04-30 — phase mappings added by roadmapper*

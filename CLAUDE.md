@@ -2,6 +2,25 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Current Project Context
+
+This repository is being developed under the **GSD (Get Shit Done)** workflow. Always read these planning docs before making non-trivial decisions:
+
+- [.planning/PROJECT.md](.planning/PROJECT.md) — current project vision, requirements, scope, and key decisions. **The "Out of Scope" section is binding** — do not propose work that contradicts it.
+- [.planning/REQUIREMENTS.md](.planning/REQUIREMENTS.md) — 47 v1 requirements with REQ-IDs, mapped to phases.
+- [.planning/ROADMAP.md](.planning/ROADMAP.md) — 4-phase roadmap; check current phase before suggesting work.
+- [.planning/STATE.md](.planning/STATE.md) — phase progress / current focus.
+- [.planning/research/SUMMARY.md](.planning/research/SUMMARY.md) — top-level research synthesis (stack, architecture, pitfalls, features).
+- [.planning/codebase/](.planning/codebase/) — pre-existing codebase map (architecture, structure, conventions, concerns, etc.).
+
+**v1 scope summary (read this first):** Sik AI v1 ships an iOS body-measurement app for the **weight-loss audience only**, using Apple Vision 3D body pose + ARKit + cylindrical heuristics for ~±2cm test-retest reproducibility. **No parametric body-shape model in v1** (SMPL/SMPL-X are non-commercial-licensed by MPI-IS — sidestepped entirely for v1). Gym / hypertrophy-grade precision is explicitly v2 territory. All data on-device. iOS only.
+
+**Workflow guidance:**
+- Use `/gsd-progress` to see current phase status.
+- Use `/gsd-plan-phase N` before executing on a phase.
+- Use `/gsd-execute-phase N` to run a planned phase.
+- Don't bypass the spike (Phase 1) — its go/no-go decision gates everything downstream.
+
 ## Repository Overview
 
 pnpm workspace monorepo. The primary deliverable is a React Native / Expo app (`artifacts/sikai`). The rest of the workspace contains supporting infrastructure (API server, shared libs, a web-based mockup sandbox).
@@ -105,4 +124,6 @@ Running `pnpm --filter @workspace/api-spec run codegen` (Orval) produces:
 - **pnpm catalog** (`pnpm-workspace.yaml`) pins shared dependency versions (react, zod, vite, tailwind, etc.). Use `catalog:` in `package.json` instead of explicit versions for cataloged packages.
 - **Supply-chain safety:** `minimumReleaseAge: 1440` is set in `pnpm-workspace.yaml`. Do not disable it. Add exceptions to `minimumReleaseAgeExclude` only for trusted publishers when urgently needed.
 - **esbuild platform overrides:** The `overrides` block in `pnpm-workspace.yaml` strips all non-linux-x64 esbuild/rollup/lightningcss binaries. This is intentional for the Replit hosting environment — do not remove these overrides.
-- **Scan data shape:** The `Scan` type (defined in `context/AppContext.tsx`) stores 11 measurements in cm/inches plus a score (0–100), date (ISO 8601), and optional `photoUri`.
+- **Scan data shape:** The actual type is `ScanRecord` (defined in `artifacts/sikai/context/AppContext.tsx`) — `BodyMeasurement` (11 numeric fields) + `weight` + `bmi` + `score` (0–100) + ISO 8601 `date` + optional `notes`. There is **no `photoUri` field** (raw images must never be persisted — see PRIV-02). Do not re-add it.
+- **Mock-data seeding:** `generateMockData()` in `AppContext.tsx` seeds 8 weeks of fake `ScanRecord`s on first launch. v1 removes this from the default path (DATA-01) and exposes it only via opt-in demo mode (DEMO-01). Do not extend the mock data; replace it.
+- **Existing scan UI is a facade.** The animated LiDAR point cloud, AR brackets, and "camera" background are visual-only — no real capture, no real measurement, no body model. v1 replaces the engine while keeping these visuals as polish on top of real capture (CAP-07).
