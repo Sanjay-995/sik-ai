@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Local Claude Code artifacts
+.claude/
+
+# Expo
+.expo/
+
+# Build outputs
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
