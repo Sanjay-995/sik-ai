@@ -1,3 +1,18 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+current_phase: Phase 1 — Feasibility Spike
+current_plan: None (phase not yet planned)
+status: Not started
+last_updated: "2026-04-30T23:22:20.515Z"
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+---
+
 # State: Sik AI v1
 
 **Last updated:** 2026-04-30
@@ -12,6 +27,7 @@
 **v1 audience:** Weight-loss users — cm-scale change tracking (±2cm reproducibility target). Gym / hypertrophy precision is v2.
 
 **Architecture decisions locked:**
+
 - No parametric body-shape model (SMPL/SMPL-X family) — sidesteps MPI commercial-license risk
 - Measurement primitive: Apple Vision 3D body pose + ARKit scale + cylindrical heuristics
 - Two-shot capture protocol (front + side)
@@ -28,6 +44,7 @@
 **Status:** Not started
 
 **Progress:**
+
 ```
 [Phase 1: Feasibility Spike      ] ░░░░░░░░░░ Not started
 [Phase 2: Native Measurement Eng ] ░░░░░░░░░░ Not started
@@ -101,12 +118,14 @@ None currently.
 ## Session Continuity
 
 **To resume after a break:**
+
 1. Read `.planning/STATE.md` (this file) — current position and open questions
 2. Read `.planning/ROADMAP.md` — phase structure and success criteria
 3. Check current phase's plan (if it exists): `.planning/phases/phase-N/PLAN.md`
 4. Run `/gsd-plan-phase 1` to create the Phase 1 execution plan
 
 **Key files:**
+
 - `.planning/PROJECT.md` — scope, constraints, key decisions
 - `.planning/REQUIREMENTS.md` — all 47 v1 requirements with phase mappings
 - `.planning/research/SUMMARY.md` — research synthesis + recommended stack
