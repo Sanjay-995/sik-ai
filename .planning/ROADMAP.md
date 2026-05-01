@@ -23,11 +23,20 @@
 **Depends on**: Nothing
 **Requirements**: SPIKE-01, SPIKE-02, SPIKE-03, SPIKE-04
 **Success Criteria** (what must be TRUE):
-  1. A throwaway harness app on a real iPhone (iOS 17+) captures front + side photos using react-native-vision-camera and successfully runs Apple Vision 3D body pose extraction.
+  1. A throwaway harness app on a real iPhone (iOS 17+) captures front + side photos using AVFoundation and successfully runs Apple Vision 3D body pose extraction. (Note: D-09 overrides ROADMAP SC#1's reference to react-native-vision-camera — the spike uses native AVFoundation only. See 01-VISIONCAMERA-COMPAT-NOTE.md.)
   2. The harness produces derived circumference values (waist, hip, chest) for at least 3 real testers spanning low / normal / high BMI categories, with no parametric body-shape model involved.
   3. The go/no-go report exists as a written document containing: same-body test-retest standard deviation per measurement, absolute accuracy vs. tape measure, and a clear recommendation.
   4. The accuracy gate decision is documented: either "test-retest reproducibility is ±2cm or better across all BMI categories tested — proceed to Phase 2" OR "gate failed — re-plan before proceeding."
-**Plans**: TBD
+**Plans**: 7 plans across 4 waves
+
+Plans:
+- [ ] 01-01-PLAN.md — Pre-spike checklist artifacts (VisionCamera compat note, ISO-8559-1 tape protocol)
+- [ ] 01-02-PLAN.md — Spike harness build (Xcode project, all Swift modules, HeuristicParams locked)
+- [ ] 01-03-PLAN.md — Tester recruitment plan + confirmation
+- [ ] 01-04-PLAN.md — Harness device install + smoke test
+- [ ] 01-05-PLAN.md — Data collection sessions (3 testers x >=4 sessions)
+- [ ] 01-06-PLAN.md — Off-device statistical analysis (Python pandas/scipy)
+- [ ] 01-07-PLAN.md — Go/no-go report authoring (01-GO-NO-GO.md)
 
 ---
 
@@ -79,7 +88,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Feasibility Spike | 0/0 | Not started | - |
+| 1. Feasibility Spike | 0/7 | Planned | - |
 | 2. Native Measurement Engine | 0/0 | Not started | - |
 | 3. Capture Flow & History | 0/0 | Not started | - |
 | 4. Coach, Paywall & Ship | 0/0 | Not started | - |
@@ -98,4 +107,4 @@
 
 ---
 
-*Last updated: 2026-04-30 — initial roadmap created*
+*Last updated: 2026-04-30 — Phase 1 planned (7 plans, 4 waves)*
