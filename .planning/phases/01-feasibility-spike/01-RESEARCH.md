@@ -764,32 +764,29 @@ print(f"Worst inter-session SD across all (bracket × measurement) cells: {worst
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All five open questions surfaced during research are substantively resolved by the plans (01-01 through 01-07). Each `RESOLVED:` line below records the locked answer that the plans implement.
 
 1. **Roadmap SC#1 vs D-09 textual contradiction.**
    - What we know: `ROADMAP.md` Phase 1 success criterion #1 says "captures front + side photos using react-native-vision-camera." `CONTEXT.md` D-09 says "react-native-vision-camera + Apple Vision + ARKit invoked directly. No Expo, no React Native bridge in the spike." (Note: the CONTEXT.md text mentions react-native-vision-camera in passing — this seems to be a stale carry-over; the rationale paragraph clearly says "no React Native bridge in the spike," and the `code_context` block says "Reusable Assets: None for Phase 1 itself.")
-   - What's unclear: How literally should the planner interpret the SC#1 wording vs the D-09 rationale?
-   - Recommendation: Treat D-09's rationale as authoritative — **native AVFoundation + Vision + ARKit only, no `react-native-vision-camera` in the spike harness.** The roadmap success criterion should be amended at phase transition to read "captures front + side photos using AVFoundation and successfully runs Apple Vision 3D body pose extraction." Surface this for the discuss-phase to confirm before planning.
+   - **RESOLVED:** D-09 is authoritative — native AVFoundation + Vision + ARKit only, NO `react-native-vision-camera` in the spike harness. Plan 01-01 documents this resolution in `01-VISIONCAMERA-COMPAT-NOTE.md`; Plan 01-02 implements the harness on AVFoundation + Vision + ARKit only. Roadmap SC#1 should be amended at phase transition.
 
 2. **Vertex-index / anatomical-y mapping for cylindrical heuristic with 17-joint Vision-3D output.**
    - What we know: Apple gives us 17 joints in metric meters (head center/top, torso 6, arms 6, legs 6). We have shoulder, hip, knee, ankle, wrist y-positions.
-   - What's unclear: The narrowest-waist y-coordinate is between shoulder and hip but is not itself a joint. We have to search the silhouette mask in a band defined by joint y-fractions. The exact y-fraction band that matches ISO-8559 "natural waist" definitions across body types is empirical. CONTEXT.md D-10 says lock the parameters, so this gets locked at spike start, not tuned.
-   - Recommendation: Lock `waistYNarrowestSearchBand: 0.40 ... 0.65` of (shoulder→hip span), and lock `chestYFromShoulder: 0.20`, `hipYFromHip: -0.05`. These are educated initial values; the spike measures whether they work. Document them in `HeuristicParams.swift` with citations to ISO 8559-1 landmark definitions. If results fail the gate, that's a HARD_REPLAN signal per D-03.
+   - **RESOLVED:** Lock `waistYNarrowestSearchBand: 0.40 ... 0.65` of (shoulder→hip span), `chestYFromShoulder: 0.20`, `hipYFromHip: -0.05` in `HeuristicParams.swift` per D-10 (Plan 01-02 Task 2). These are educated initial values; the spike measures whether they work. If results fail the gate, that's a HARD_REPLAN signal per D-03 — not a tuning loop.
 
 3. **Should the same-session 5-rapid-capture sub-test be mandatory or optional?**
    - What we know: CONTEXT.md "Claude's Discretion" says "included as a secondary check unless it adds meaningful schedule risk."
-   - What's unclear: What's the schedule cost?
-   - Recommendation: Include it. It's ~10 seconds per session per tester (5 fast captures back-to-back), and it directly characterizes the segmentation noise floor (Pitfall 6). Skipping it means we cannot distinguish "the body actually changed" from "the segmentation flickered." Include — schedule cost is negligible.
+   - **RESOLVED:** Mandatory. ~10 seconds per session per tester, directly characterizes the segmentation noise floor (Pitfall 6). Plan 01-05 includes it in the session protocol; Plan 01-07 reports it as a secondary metric.
 
 4. **Which iPhone to use for the spike?**
    - What we know: A non-LiDAR iPhone is preferred so we measure the no-LiDAR experience that v1 will ship to the majority of the install base. Apple Vision 3D works on all iOS 17+ iPhones; LiDAR only changes `bodyHeight` accuracy (which we shouldn't trust anyway).
-   - What's unclear: Does the founder's personal device meet the criterion?
-   - Recommendation: Use a non-Pro iPhone (e.g., iPhone 14, 15, 16 — non-Pro variants are non-LiDAR). If the only available device is a Pro, force-skip `bodyHeight` regardless and document this in the report. Cross-device benchmarking is deferred per CONTEXT.md "Claude's Discretion" — a single device is enough to call the gate.
+   - **RESOLVED:** Use a non-Pro iPhone (iPhone 14 / 15 / 16 non-Pro = non-LiDAR). If only a Pro is available, force-skip `bodyHeight` regardless and document in the report. Cross-device benchmarking deferred to Phase 2. Plan 01-04 records the chosen device in the harness README at lock time.
 
 5. **Tape-measure ground-truth landmark definitions: ISO 8559-1 vs fitness-industry standard.**
    - What we know: ISO 8559-1:2017 is the canonical international standard for clothing-grade body measurement. Some fitness-industry tape protocols differ slightly (e.g., "natural waist" vs "belly button level").
-   - What's unclear: Which exact landmark definitions to use.
-   - Recommendation: Use ISO 8559-1 landmarks — natural waist (smallest horizontal circumference between bottom of ribs and top of hips), hip (largest horizontal circumference at the hips/buttocks), chest (largest horizontal circumference under the armpits at fullest part). Document the exact protocol with photos in the harness README. Pitfall 15 (landmark ambiguity) demands this explicit definition. `[CITED: ISO 8559-1:2017 Anthropometric definitions for body measurement]`
+   - **RESOLVED:** ISO 8559-1 landmarks — natural waist (smallest horizontal circumference between bottom of ribs and top of hips), hip (largest horizontal circumference at the hips/buttocks), chest (largest horizontal circumference under the armpits at fullest part). Plan 01-01 Task 2 produces `01-TAPE-PROTOCOL.md` with photos and the explicit ISO 8559-1 protocol. `[CITED: ISO 8559-1:2017 Anthropometric definitions for body measurement]`
 
 ---
 
