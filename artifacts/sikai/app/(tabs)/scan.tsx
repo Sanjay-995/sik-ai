@@ -168,7 +168,9 @@ export default function ScanScreen() {
     }
   }
 
-  async function callScanAPI(photoData: PhotoState): Promise<Omit<ScanRecord, 'id' | 'date'> | null> {
+  type ScanAPIResult = Omit<ScanRecord, 'id' | 'date'> & { insights: string[] };
+
+  async function callScanAPI(photoData: PhotoState): Promise<ScanAPIResult | null> {
     try {
       const body = {
         frontImage: photoData.frontBase64,
@@ -200,6 +202,7 @@ export default function ScanScreen() {
         weight: data.weight,
         bmi: data.bmi,
         score: data.score,
+        insights: data.insights ?? [],
       };
     } catch (e) {
       console.warn('Scan API fetch error:', e);
@@ -270,9 +273,11 @@ export default function ScanScreen() {
     ]);
 
     // Use AI result or fall back
-    const finalResult = apiResult ?? fallbackResult(profile.weight, profile.height);
     const isAI = apiResult !== null;
-    const insights: string[] = (apiResult as (typeof apiResult & { insights?: string[] }) | null)?.insights ?? [];
+    const insights: string[] = apiResult?.insights ?? [];
+    const finalResult: Omit<ScanRecord, 'id' | 'date'> = apiResult
+      ? { measurements: apiResult.measurements, weight: apiResult.weight, bmi: apiResult.bmi, score: apiResult.score }
+      : fallbackResult(profile.weight, profile.height);
 
     // If animation finished before API (rare), show results now
     // If API finished before animation, it already released the 85% gate
@@ -424,6 +429,7 @@ export default function ScanScreen() {
       {/* Scanning info bar */}
       {scanState === 'scanning' && (
         <View style={[styles.footer, { paddingBottom: bottomPad }]}>
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 12 }}>{Math.round(progress)}%</Text>
           <View style={styles.scanningBar}>
             <View style={styles.scanningBarDot}>
               <View style={[styles.pulsingDot, { backgroundColor: colors.emerald }]} />
