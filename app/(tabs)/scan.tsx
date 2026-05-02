@@ -69,13 +69,17 @@ function AnimatedNumber({ value, unit, duration = 800 }: { value: number; unit?:
 
   useEffect(() => {
     anim.setValue(0);
-    Animated.timing(anim, {
+    const animation = Animated.timing(anim, {
       toValue: value, duration,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-    }).start();
+    });
+    animation.start();
     const listener = anim.addListener(({ value: v }) => setDisplay(v.toFixed(1)));
-    return () => anim.removeListener(listener);
+    return () => {
+      animation.stop();
+      anim.removeListener(listener);
+    };
   }, [value]);
 
   return (
@@ -110,6 +114,7 @@ export default function ScanScreen() {
   const headerOpacity = useRef(new Animated.Value(1)).current;
   const btnScale = useRef(new Animated.Value(1)).current;
   const photoPreviewOpacity = useRef(new Animated.Value(0)).current;
+  const animatedNumber = useRef(new Animated.Value(0)).current;
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 84;
@@ -231,7 +236,7 @@ export default function ScanScreen() {
       p += increment;
       if (p >= 100) {
         p = 100;
-        clearInterval(progressRef.current!);
+        if (progressRef.current) clearInterval(progressRef.current);
         setProgress(100);
         setTimeout(onComplete, 300);
       } else {
@@ -248,8 +253,8 @@ export default function ScanScreen() {
   }
 
   function showResults(scanResult: Omit<ScanRecord, 'id' | 'date'>, isAI: boolean, insights: string[]) {
-    clearInterval(progressRef.current!);
-    clearInterval(phaseRef.current!);
+    if (progressRef.current) clearInterval(progressRef.current);
+    if (phaseRef.current) clearInterval(phaseRef.current);
     setPhaseIndex(SCAN_PHASES.length - 1);
     setResult(scanResult);
     setAiInsights(insights);
@@ -317,8 +322,8 @@ export default function ScanScreen() {
   }
 
   function resetScan() {
-    clearInterval(progressRef.current!);
-    clearInterval(phaseRef.current!);
+    if (progressRef.current) clearInterval(progressRef.current);
+    if (phaseRef.current) clearInterval(phaseRef.current);
     setScanState('idle');
     setProgress(0);
     setPhaseIndex(0);
