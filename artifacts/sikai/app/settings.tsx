@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '@/hooks/useColors';
@@ -23,10 +24,16 @@ interface SettingRowProps {
 
 function SettingRow({ icon, label, value, onPress, toggle, toggleValue, onToggle, destructive }: SettingRowProps) {
   const colors = useColors();
+
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (onPress) onPress();
+  };
+
   return (
     <TouchableOpacity
       style={[styles.settingRow, { borderBottomColor: colors.border }]}
-      onPress={onPress}
+      onPress={handlePress}
       disabled={toggle}
     >
       <View style={styles.settingLeft}>
@@ -66,9 +73,22 @@ export default function SettingsScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
 
-  async function handleResetData() {
-    await AsyncStorage.clear();
-    router.replace('/onboarding');
+  function handleResetData() {
+    Alert.alert(
+      'Reset All Data',
+      'This will permanently delete all your scans, chat history, and profile settings. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset Everything',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.clear();
+            router.replace('/onboarding');
+          },
+        },
+      ]
+    );
   }
 
   async function saveName() {
@@ -153,7 +173,7 @@ export default function SettingsScreen() {
 
       {/* Profile settings */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Profile</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>PROFILE</Text>
         <View style={[styles.settingsGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SettingRow icon="target" label="Goal" value={profile.goal.replace('_', ' ')} onPress={() => {}} />
           <SettingRow icon="user" label="Gender" value={profile.gender} onPress={() => {}} />
@@ -163,7 +183,7 @@ export default function SettingsScreen() {
 
       {/* Notifications */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Notifications</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>PREFERENCES</Text>
         <View style={[styles.settingsGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SettingRow
             icon="bell"
@@ -184,7 +204,7 @@ export default function SettingsScreen() {
 
       {/* About */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>About</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ABOUT</Text>
         <View style={[styles.settingsGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <SettingRow icon="shield" label="Privacy Policy" onPress={() => {}} />
           <SettingRow icon="file-text" label="Terms of Service" onPress={() => {}} />
@@ -195,8 +215,8 @@ export default function SettingsScreen() {
 
       {/* Danger zone */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Data</Text>
-        <View style={[styles.settingsGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DATA</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.card, borderColor: colors.destructive }]} >
           <SettingRow
             icon="trash-2"
             label="Reset All Data"
