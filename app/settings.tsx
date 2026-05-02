@@ -175,7 +175,7 @@ export default function SettingsScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.foreground }]}>Settings</Text>
@@ -219,7 +219,7 @@ export default function SettingsScreen() {
           </View>
         )}
         {!isEditingName && (
-          <TouchableOpacity onPress={() => setIsEditingName(true)}>
+          <TouchableOpacity onPress={() => setIsEditingName(true)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
             <Feather name="edit-2" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         )}
