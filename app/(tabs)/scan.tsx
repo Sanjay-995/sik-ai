@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
+import { useUnits } from '@/hooks/useUnits';
 import { LiDARScanner } from '@/components/LiDARScanner';
 import { ScanRecord, BodyMeasurement } from '@/context/AppContext';
 
@@ -93,6 +94,7 @@ export default function ScanScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { addScan, profile, previousScan } = useApp();
+  const { convertLen, convertWt, lenUnit, wtUnit } = useUnits();
 
   const [scanState, setScanState] = useState<'idle' | 'photo' | 'scanning' | 'complete' | 'error'>('idle');
   const [photos, setPhotos] = useState<PhotoState | null>(null);
@@ -354,17 +356,17 @@ export default function ScanScreen() {
     : colors.emerald;
 
   const SUMMARY_ROWS = result ? [
-    { label: 'Neck', value: result.measurements.neck, unit: 'cm' },
-    { label: 'Shoulders', value: result.measurements.shoulders, unit: 'cm' },
-    { label: 'Chest', value: result.measurements.chest, unit: 'cm' },
-    { label: 'Waist', value: result.measurements.waist, unit: 'cm' },
-    { label: 'Hips', value: result.measurements.hips, unit: 'cm' },
-    { label: 'Left Arm', value: result.measurements.leftArm, unit: 'cm' },
-    { label: 'Right Arm', value: result.measurements.rightArm, unit: 'cm' },
-    { label: 'Left Thigh', value: result.measurements.leftThigh, unit: 'cm' },
-    { label: 'Right Thigh', value: result.measurements.rightThigh, unit: 'cm' },
-    { label: 'Body Fat', value: result.measurements.bodyFat, unit: '%' },
-    { label: 'Muscle Mass', value: result.measurements.muscleMass, unit: 'kg' },
+    { label: 'Neck', value: convertLen(result.measurements.neck), rawCm: result.measurements.neck, unit: lenUnit },
+    { label: 'Shoulders', value: convertLen(result.measurements.shoulders), rawCm: result.measurements.shoulders, unit: lenUnit },
+    { label: 'Chest', value: convertLen(result.measurements.chest), rawCm: result.measurements.chest, unit: lenUnit },
+    { label: 'Waist', value: convertLen(result.measurements.waist), rawCm: result.measurements.waist, unit: lenUnit },
+    { label: 'Hips', value: convertLen(result.measurements.hips), rawCm: result.measurements.hips, unit: lenUnit },
+    { label: 'Left Arm', value: convertLen(result.measurements.leftArm), rawCm: result.measurements.leftArm, unit: lenUnit },
+    { label: 'Right Arm', value: convertLen(result.measurements.rightArm), rawCm: result.measurements.rightArm, unit: lenUnit },
+    { label: 'Left Thigh', value: convertLen(result.measurements.leftThigh), rawCm: result.measurements.leftThigh, unit: lenUnit },
+    { label: 'Right Thigh', value: convertLen(result.measurements.rightThigh), rawCm: result.measurements.rightThigh, unit: lenUnit },
+    { label: 'Body Fat', value: result.measurements.bodyFat, rawCm: result.measurements.bodyFat, unit: '%' },
+    { label: 'Muscle Mass', value: convertWt(result.measurements.muscleMass), rawCm: result.measurements.muscleMass, unit: wtUnit },
   ] : [];
 
   return (
@@ -506,7 +508,7 @@ export default function ScanScreen() {
               </View>
               <View style={styles.scoreMeta}>
                 <View style={styles.scoreMetaItem}>
-                  <Text style={styles.scoreMetaValue}>{result.weight}kg</Text>
+                  <Text style={styles.scoreMetaValue}>{convertWt(result.weight).toFixed(1)}{wtUnit}</Text>
                   <Text style={styles.scoreMetaLabel}>Weight</Text>
                 </View>
                 <View style={styles.scoreMetaDivider} />
@@ -519,7 +521,7 @@ export default function ScanScreen() {
                 <View style={styles.scoreMetaDivider} />
                 <View style={styles.scoreMetaItem}>
                   <Text style={[styles.scoreMetaValue, { color: colors.chartBlue }]}>
-                    {result.measurements.muscleMass.toFixed(1)}kg
+                    {convertWt(result.measurements.muscleMass).toFixed(1)}{wtUnit}
                   </Text>
                   <Text style={styles.scoreMetaLabel}>Muscle</Text>
                 </View>
@@ -579,9 +581,9 @@ export default function ScanScreen() {
                   <View style={styles.measurementValueRow}>
                     <Text style={styles.measurementValue}>{row.value.toFixed(1)}</Text>
                     <Text style={styles.measurementUnit}>{row.unit}</Text>
-                    {isAiScan && row.unit === 'cm' && (
+                    {isAiScan && row.unit === lenUnit && row.unit !== '%' && row.unit !== wtUnit && (
                       <Text style={styles.confidenceText}>
-                        ±{(row.value * 0.015).toFixed(1)}
+                        ±{(row.rawCm * 0.015).toFixed(1)}
                       </Text>
                     )}
                   </View>
