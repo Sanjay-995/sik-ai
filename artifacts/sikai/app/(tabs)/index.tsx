@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Platform, Dimensions
@@ -20,6 +20,13 @@ export default function DashboardScreen() {
   const { profile, latestScan, previousScan } = useApp();
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>('waist');
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Good morning,';
+    if (hour >= 12 && hour < 18) return 'Good afternoon,';
+    return 'Good evening,';
+  }, []);
+
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 84;
 
@@ -39,8 +46,8 @@ export default function DashboardScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 8 }]}>
         <View>
-          <Text style={[styles.greeting, { color: colors.textSecondary }]}>Good morning,</Text>
-          <Text style={[styles.name, { color: colors.foreground }]}>{profile.name.split(' ')[0]} 👋</Text>
+          <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
+          <Text style={[styles.name, { color: colors.foreground }]}>{profile.name.split(' ')[0]}</Text>
         </View>
         <TouchableOpacity
           style={[styles.proBtn, { backgroundColor: profile.isPro ? colors.emeraldGlow : colors.card, borderColor: profile.isPro ? 'rgba(16,185,129,0.4)' : colors.border }]}
