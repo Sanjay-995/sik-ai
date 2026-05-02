@@ -54,6 +54,7 @@ export default function CoachScreen() {
   const { chatMessages, addChatMessage, clearChat, profile, latestScan } = useApp();
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -106,7 +107,7 @@ export default function CoachScreen() {
         styles.messageBubble,
         isUser ? styles.userBubble : styles.aiBubble,
         isUser
-          ? { backgroundColor: colors.emerald }
+          ? { backgroundColor: colors.emeraldGlow, borderColor: colors.emerald, borderWidth: 1 }
           : { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 },
       ]}>
         {!isUser && (
@@ -189,14 +190,21 @@ export default function CoachScreen() {
       {/* Input */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
         <View style={[
           styles.inputContainer,
-          { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: bottomPad + (Platform.OS === 'web' ? 84 : insets.bottom + 84) }
+          { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Platform.OS === 'web' ? 34 + 84 : insets.bottom + 60 }
         ]}>
           <TextInput
-            style={[styles.textInput, { backgroundColor: colors.surface, color: colors.foreground, borderColor: colors.border }]}
+            style={[
+              styles.textInput,
+              {
+                backgroundColor: colors.surface,
+                color: colors.foreground,
+                borderColor: isFocused ? colors.emerald : colors.border
+              }
+            ]}
             placeholder="Ask your AI coach..."
             placeholderTextColor={colors.textTertiary}
             value={inputText}
@@ -204,6 +212,9 @@ export default function CoachScreen() {
             multiline
             maxLength={500}
             onSubmitEditing={sendMessage}
+            autoFocus={false}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
           />
           <TouchableOpacity
             style={[
