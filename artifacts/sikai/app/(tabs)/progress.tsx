@@ -26,11 +26,30 @@ const METRICS: Array<{ key: MetricKey; label: string; unit: string; color: strin
 export default function ProgressScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { scanHistory, latestScan, scanHistory: scans } = useApp();
+  const { scanHistory: scans, latestScan } = useApp();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('weight');
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 84;
+
+  if (scans.length < 2) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { paddingTop: topPad + 8 }]}>
+          <Text style={[styles.title, { color: colors.foreground }]}>Progress</Text>
+        </View>
+        <View style={styles.emptyContainer}>
+          <View style={[styles.emptyIconCircle, { backgroundColor: colors.emeraldGlow }]}>
+            <Feather name="trending-up" size={40} color={colors.emerald} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No progress yet</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+            Complete at least 2 scans to see your progress trends
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const selectedMetricInfo = METRICS.find(m => m.key === selectedMetric)!;
 
@@ -100,7 +119,7 @@ export default function ProgressScreen() {
         </View>
 
         <ProgressChart
-          scans={scanHistory}
+          scans={scans}
           metric={selectedMetric as any}
           color={selectedMetricInfo.color}
         />
@@ -141,22 +160,25 @@ export default function ProgressScreen() {
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>8-Week Summary</Text>
         <View style={styles.summaryGrid}>
           {[
-            { label: 'Weight Lost', value: scans.length >= 2 ? `${Math.abs(scans[0].weight - scans[scans.length - 1].weight).toFixed(1)}kg` : '--', positive: true, icon: 'trending-down' },
-            { label: 'Fat Lost', value: scans.length >= 2 ? `${Math.abs(scans[0].measurements.bodyFat - scans[scans.length - 1].measurements.bodyFat).toFixed(1)}%` : '--', positive: true, icon: 'activity' },
-            { label: 'Muscle Gained', value: scans.length >= 2 ? `+${Math.abs(scans[0].measurements.muscleMass - scans[scans.length - 1].measurements.muscleMass).toFixed(1)}kg` : '--', positive: true, icon: 'trending-up' },
-            { label: 'Score Improved', value: scans.length >= 2 ? `+${scans[0].score - scans[scans.length - 1].score}pts` : '--', positive: true, icon: 'star' },
-          ].map(item => (
-            <View
-              key={item.label}
-              style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <View style={[styles.summaryIcon, { backgroundColor: colors.emeraldGlow }]}>
-                <Feather name={item.icon as any} size={16} color={colors.emerald} />
+            { label: 'Weight Lost', value: scans.length >= 2 ? `${Math.abs(scans[0].weight - scans[scans.length - 1].weight).toFixed(1)}kg` : '--', metric: 'weight', diff: scans[0].weight - scans[scans.length - 1].weight },
+            { label: 'Fat Lost', value: scans.length >= 2 ? `${Math.abs(scans[0].measurements.bodyFat - scans[scans.length - 1].measurements.bodyFat).toFixed(1)}%` : '--', metric: 'bodyFat', diff: scans[0].measurements.bodyFat - scans[scans.length - 1].measurements.bodyFat },
+            { label: 'Muscle Gained', value: scans.length >= 2 ? `${Math.abs(scans[0].measurements.muscleMass - scans[scans.length - 1].measurements.muscleMass).toFixed(1)}kg` : '--', metric: 'muscleMass', diff: scans[0].measurements.muscleMass - scans[scans.length - 1].measurements.muscleMass },
+            { label: 'Score Improved', value: scans.length >= 2 ? `${Math.abs(scans[0].score - scans[scans.length - 1].score)}pts` : '--', metric: 'score', diff: scans[0].score - scans[scans.length - 1].score },
+          ].map(item => {
+            const isImprovement = (item.metric === 'weight' || item.metric === 'bodyFat') ? item.diff < 0 : item.diff > 0;
+            return (
+              <View
+                key={item.label}
+                style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <View style={[styles.summaryIcon, { backgroundColor: isImprovement ? colors.emeraldGlow : 'rgba(239,68,68,0.12)' }]}>
+                  <Feather name={isImprovement ? 'arrow-up' : 'arrow-down'} size={16} color={isImprovement ? colors.emerald : colors.destructive} />
+                </View>
+                <Text style={[styles.summaryValue, { color: colors.foreground }]}>{item.value}</Text>
+                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>{item.label}</Text>
               </View>
-              <Text style={[styles.summaryValue, { color: colors.foreground }]}>{item.value}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>{item.label}</Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </View>
     </ScrollView>
@@ -230,4 +252,29 @@ const styles = StyleSheet.create({
   },
   summaryValue: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
   summaryLabel: { fontSize: 12 },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    marginTop: 60,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });
