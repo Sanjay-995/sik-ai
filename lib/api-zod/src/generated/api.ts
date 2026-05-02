@@ -14,3 +14,53 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Accepts a front-view (and optional side-view) photo plus user profile, returns AI-estimated body measurements.
+ * @summary Analyze body scan photo with AI
+ */
+export const AnalyzeScanBody = zod.object({
+  frontImage: zod
+    .string()
+    .describe(
+      "Base64-encoded front-view photo (JPEG\/PNG, without data URI prefix)",
+    ),
+  sideImage: zod
+    .string()
+    .optional()
+    .describe(
+      "Base64-encoded side-view photo (optional, without data URI prefix)",
+    ),
+  profile: zod.object({
+    height: zod.number().describe("Height in cm"),
+    weight: zod.number().describe("Weight in kg"),
+    age: zod.number(),
+    gender: zod.enum(["male", "female"]),
+    goal: zod
+      .enum(["lose_weight", "build_muscle", "maintain", "improve_fitness"])
+      .optional(),
+  }),
+});
+
+export const AnalyzeScanResponse = zod.object({
+  measurements: zod.object({
+    chest: zod.number(),
+    waist: zod.number(),
+    hips: zod.number(),
+    leftArm: zod.number(),
+    rightArm: zod.number(),
+    leftThigh: zod.number(),
+    rightThigh: zod.number(),
+    neck: zod.number(),
+    shoulders: zod.number(),
+    bodyFat: zod.number(),
+    muscleMass: zod.number(),
+  }),
+  weight: zod.number(),
+  bmi: zod.number(),
+  score: zod.number(),
+  insights: zod
+    .array(zod.string())
+    .optional()
+    .describe("Short AI-generated insights about the scan"),
+});
