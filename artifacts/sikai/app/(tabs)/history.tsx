@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Platform
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Platform, LayoutAnimation, UIManager, Animated
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -8,8 +8,14 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp, ScanRecord } from '@/context/AppContext';
 
-function ScanItem({ scan, index, onPress }: { scan: ScanRecord; index: number; onPress: () => void }) {
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function ScanItem({ scan, index }: { scan: ScanRecord; index: number }) {
   const colors = useColors();
+  const [expanded, setExpanded] = useState(false);
+  const spinValue = React.useRef(new Animated.Value(0)).current;
   const date = new Date(scan.date);
   const isLatest = index === 0;
 
@@ -19,45 +25,96 @@ function ScanItem({ scan, index, onPress }: { scan: ScanRecord; index: number; o
     ? colors.chartOrange
     : colors.destructive;
 
-  return (
-    <TouchableOpacity
-      style={[styles.scanCard, { backgroundColor: colors.card, borderColor: isLatest ? 'rgba(16,185,129,0.3)' : colors.border }]}
-      onPress={onPress}
-    >
-      <View style={styles.scanCardLeft}>
-        <View style={[styles.dateBox, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.dateMonth, { color: colors.textSecondary }]}>
-            {date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
-          </Text>
-          <Text style={[styles.dateDay, { color: colors.foreground }]}>{date.getDate()}</Text>
-        </View>
-        <View style={styles.scanInfo}>
-          <View style={styles.scanInfoRow}>
-            <Text style={[styles.scanTitle, { color: colors.foreground }]}>
-              Body Scan {isLatest ? '(Latest)' : ''}
-            </Text>
-            {isLatest && (
-              <View style={[styles.latestBadge, { backgroundColor: colors.emeraldGlow }]}>
-                <Text style={[styles.latestBadgeText, { color: colors.emerald }]}>NEW</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.scanSubtitle, { color: colors.textSecondary }]}>
-            {scan.weight}kg · {scan.measurements.bodyFat.toFixed(1)}% body fat
-          </Text>
-          <Text style={[styles.scanSubtitle, { color: colors.textTertiary }]}>
-            Waist {scan.measurements.waist.toFixed(1)}cm · BMI {scan.bmi}
-          </Text>
-        </View>
-      </View>
+  function toggle() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(e => {
+      Animated.timing(spinValue, {
+        toValue: e ? 0 : 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      return !e;
+    });
+  }
 
-      <View style={styles.scanCardRight}>
-        <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
-          <Text style={[styles.scoreText, { color: scoreColor }]}>{scan.score}</Text>
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg']
+  });
+
+  const DETAIL_ROWS = [
+    { label: 'Chest', value: `${scan.measurements.chest.toFixed(1)} cm` },
+    { label: 'Waist', value: `${scan.measurements.waist.toFixed(1)} cm` },
+    { label: 'Hips', value: `${scan.measurements.hips.toFixed(1)} cm` },
+    { label: 'Shoulders', value: `${scan.measurements.shoulders.toFixed(1)} cm` },
+    { label: 'Left Arm', value: `${scan.measurements.leftArm.toFixed(1)} cm` },
+    { label: 'Right Arm', value: `${scan.measurements.rightArm.toFixed(1)} cm` },
+    { label: 'Left Thigh', value: `${scan.measurements.leftThigh.toFixed(1)} cm` },
+    { label: 'Right Thigh', value: `${scan.measurements.rightThigh.toFixed(1)} cm` },
+    { label: 'Neck', value: `${scan.measurements.neck.toFixed(1)} cm` },
+    { label: 'Body Fat', value: `${scan.measurements.bodyFat.toFixed(1)}%` },
+    { label: 'Muscle Mass', value: `${scan.measurements.muscleMass.toFixed(1)} kg` },
+    { label: 'BMI', value: `${scan.bmi}` },
+  ];
+
+  return (
+    <View style={[styles.scanCard, { backgroundColor: colors.card, borderColor: isLatest ? 'rgba(16,185,129,0.3)' : colors.border }]}>
+      <TouchableOpacity onPress={toggle} activeOpacity={0.75} style={styles.scanCardHeader}>
+        <View style={styles.scanCardLeft}>
+          <View style={[styles.dateBox, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.dateMonth, { color: colors.textSecondary }]}>
+              {date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+            </Text>
+            <Text style={[styles.dateDay, { color: colors.foreground }]}>{date.getDate()}</Text>
+          </View>
+          <View style={styles.scanInfo}>
+            <View style={styles.scanInfoRow}>
+              <Text style={[styles.scanTitle, { color: colors.foreground }]}>
+                Body Scan {isLatest ? '(Latest)' : ''}
+              </Text>
+              {isLatest && (
+                <View style={[styles.latestBadge, { backgroundColor: colors.emeraldGlow }]}>
+                  <Text style={[styles.latestBadgeText, { color: colors.emerald }]}>NEW</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.scanSubtitle, { color: colors.textSecondary }]}>
+              {scan.weight}kg · {scan.measurements.bodyFat.toFixed(1)}% body fat
+            </Text>
+            <Text style={[styles.scanSubtitle, { color: colors.textTertiary }]}>
+              Waist {scan.measurements.waist.toFixed(1)}cm · BMI {scan.bmi}
+            </Text>
+          </View>
         </View>
-        <Feather name="chevron-right" size={16} color={colors.textTertiary} />
-      </View>
-    </TouchableOpacity>
+
+        <View style={styles.scanCardRight}>
+          <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
+            <Text style={[styles.scoreText, { color: scoreColor }]}>{scan.score}</Text>
+          </View>
+          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+            <Feather name="chevron-down" size={16} color={colors.textTertiary} />
+          </Animated.View>
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={[styles.expandedDetails, { borderTopColor: colors.border }]}>
+          {DETAIL_ROWS.map((row, i) => (
+            <View
+              key={row.label}
+              style={[
+                styles.detailRow, 
+                i < DETAIL_ROWS.length - 1 && { borderBottomWidth: 0.5, borderBottomColor: colors.border },
+                { backgroundColor: i % 2 === 0 ? colors.surface : 'transparent' }
+              ]}
+            >
+              <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{row.label}</Text>
+              <Text style={[styles.detailValue, { color: colors.foreground }]}>{row.value}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -111,11 +168,7 @@ export default function HistoryScreen() {
         data={scanHistory}
         keyExtractor={item => item.id}
         renderItem={({ item, index }) => (
-          <ScanItem
-            scan={item}
-            index={index}
-            onPress={() => {}}
-          />
+          <ScanItem scan={item} index={index} />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
         showsVerticalScrollIndicator={false}
@@ -172,11 +225,26 @@ const styles = StyleSheet.create({
   scanCard: {
     borderRadius: 16,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  scanCardHeader: {
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  expandedDetails: {
+    borderTopWidth: 1,
+    paddingHorizontal: 14,
+    paddingBottom: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 9,
+  },
+  detailLabel: { fontSize: 13 },
+  detailValue: { fontSize: 13, fontWeight: '600' },
   scanCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   dateBox: {
     width: 46,
