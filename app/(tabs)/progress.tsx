@@ -6,28 +6,36 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
+import { useUnits } from '@/hooks/useUnits';
 import { ProgressChart } from '@/components/ProgressChart';
 
 type MetricKey = 'weight' | 'bodyFat' | 'chest' | 'waist' | 'hips' | 'leftArm' | 'leftThigh' | 'muscleMass' | 'score' | 'bmi';
 
-const METRICS: Array<{ key: MetricKey; label: string; unit: string; color: string }> = [
-  { key: 'weight', label: 'Weight', unit: 'kg', color: '#3B82F6' },
-  { key: 'bodyFat', label: 'Body Fat', unit: '%', color: '#F59E0B' },
-  { key: 'muscleMass', label: 'Muscle Mass', unit: 'kg', color: '#10B981' },
-  { key: 'score', label: 'Body Score', unit: '', color: '#8B5CF6' },
-  { key: 'waist', label: 'Waist', unit: 'cm', color: '#EF4444' },
-  { key: 'chest', label: 'Chest', unit: 'cm', color: '#10B981' },
-  { key: 'hips', label: 'Hips', unit: 'cm', color: '#F59E0B' },
-  { key: 'leftArm', label: 'Arm', unit: 'cm', color: '#3B82F6' },
-  { key: 'leftThigh', label: 'Thigh', unit: 'cm', color: '#8B5CF6' },
-  { key: 'bmi', label: 'BMI', unit: '', color: '#10B981' },
-];
+const METRIC_COLORS: Record<MetricKey, string> = {
+  weight: '#3B82F6', bodyFat: '#F59E0B', muscleMass: '#10B981',
+  score: '#8B5CF6', waist: '#EF4444', chest: '#10B981',
+  hips: '#F59E0B', leftArm: '#3B82F6', leftThigh: '#8B5CF6', bmi: '#10B981',
+};
 
 export default function ProgressScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { scanHistory: scans, latestScan } = useApp();
+  const { convertLen, convertWt, lenUnit, wtUnit } = useUnits();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('weight');
+
+  const METRICS: Array<{ key: MetricKey; label: string; unit: string; color: string }> = [
+    { key: 'weight', label: 'Weight', unit: wtUnit, color: METRIC_COLORS.weight },
+    { key: 'bodyFat', label: 'Body Fat', unit: '%', color: METRIC_COLORS.bodyFat },
+    { key: 'muscleMass', label: 'Muscle Mass', unit: wtUnit, color: METRIC_COLORS.muscleMass },
+    { key: 'score', label: 'Body Score', unit: '', color: METRIC_COLORS.score },
+    { key: 'waist', label: 'Waist', unit: lenUnit, color: METRIC_COLORS.waist },
+    { key: 'chest', label: 'Chest', unit: lenUnit, color: METRIC_COLORS.chest },
+    { key: 'hips', label: 'Hips', unit: lenUnit, color: METRIC_COLORS.hips },
+    { key: 'leftArm', label: 'Arm', unit: lenUnit, color: METRIC_COLORS.leftArm },
+    { key: 'leftThigh', label: 'Thigh', unit: lenUnit, color: METRIC_COLORS.leftThigh },
+    { key: 'bmi', label: 'BMI', unit: '', color: METRIC_COLORS.bmi },
+  ];
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 84;
@@ -53,21 +61,27 @@ export default function ProgressScreen() {
 
   const selectedMetricInfo = METRICS.find(m => m.key === selectedMetric)!;
 
+  const convertValue = (key: MetricKey, raw: number): number => {
+    if (key === 'weight' || key === 'muscleMass') return convertWt(raw);
+    if (key === 'chest' || key === 'waist' || key === 'hips' || key === 'leftArm' || key === 'leftThigh') return convertLen(raw);
+    return raw;
+  };
+
   const getValue = (key: MetricKey): number => {
     if (!latestScan) return 0;
-    if (key === 'weight') return latestScan.weight;
+    if (key === 'weight') return convertValue(key, latestScan.weight);
     if (key === 'bmi') return latestScan.bmi;
     if (key === 'score') return latestScan.score;
-    return latestScan.measurements[key as keyof typeof latestScan.measurements] ?? 0;
+    return convertValue(key, latestScan.measurements[key as keyof typeof latestScan.measurements] ?? 0);
   };
 
   const getPrevValue = (key: MetricKey): number => {
     if (!scans[scans.length - 1]) return getValue(key);
     const oldest = scans[scans.length - 1];
-    if (key === 'weight') return oldest.weight;
+    if (key === 'weight') return convertValue(key, oldest.weight);
     if (key === 'bmi') return oldest.bmi;
     if (key === 'score') return oldest.score;
-    return oldest.measurements[key as keyof typeof oldest.measurements] ?? 0;
+    return convertValue(key, oldest.measurements[key as keyof typeof oldest.measurements] ?? 0);
   };
 
   return (
@@ -160,9 +174,9 @@ export default function ProgressScreen() {
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>8-Week Summary</Text>
         <View style={styles.summaryGrid}>
           {[
-            { label: 'Weight Lost', value: scans.length >= 2 ? `${Math.abs(scans[0].weight - scans[scans.length - 1].weight).toFixed(1)}kg` : '--', metric: 'weight', diff: scans[0].weight - scans[scans.length - 1].weight },
+            { label: 'Weight Lost', value: scans.length >= 2 ? `${Math.abs(convertWt(scans[0].weight - scans[scans.length - 1].weight)).toFixed(1)}${wtUnit}` : '--', metric: 'weight', diff: scans[0].weight - scans[scans.length - 1].weight },
             { label: 'Fat Lost', value: scans.length >= 2 ? `${Math.abs(scans[0].measurements.bodyFat - scans[scans.length - 1].measurements.bodyFat).toFixed(1)}%` : '--', metric: 'bodyFat', diff: scans[0].measurements.bodyFat - scans[scans.length - 1].measurements.bodyFat },
-            { label: 'Muscle Gained', value: scans.length >= 2 ? `${Math.abs(scans[0].measurements.muscleMass - scans[scans.length - 1].measurements.muscleMass).toFixed(1)}kg` : '--', metric: 'muscleMass', diff: scans[0].measurements.muscleMass - scans[scans.length - 1].measurements.muscleMass },
+            { label: 'Muscle Gained', value: scans.length >= 2 ? `${Math.abs(convertWt(scans[0].measurements.muscleMass - scans[scans.length - 1].measurements.muscleMass)).toFixed(1)}${wtUnit}` : '--', metric: 'muscleMass', diff: scans[0].measurements.muscleMass - scans[scans.length - 1].measurements.muscleMass },
             { label: 'Score Improved', value: scans.length >= 2 ? `${Math.abs(scans[0].score - scans[scans.length - 1].score)}pts` : '--', metric: 'score', diff: scans[0].score - scans[scans.length - 1].score },
           ].map(item => {
             const isImprovement = (item.metric === 'weight' || item.metric === 'bodyFat') ? item.diff < 0 : item.diff > 0;
