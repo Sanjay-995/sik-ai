@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Platform,
-  Dimensions, Animated, ScrollView, Easing
+  Dimensions, Animated, ScrollView, Easing, Alert, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
@@ -14,63 +15,61 @@ import { ScanRecord, BodyMeasurement } from '@/context/AppContext';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
+const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
+  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
+  : '';
+
 const SCAN_PHASES = [
-  'Initializing LiDAR sensors...',
-  'Calibrating depth camera...',
+  'Initializing AI model...',
+  'Processing depth data...',
   'Mapping body surface...',
-  'Capturing point cloud data...',
+  'Detecting skeletal landmarks...',
   'Measuring chest & shoulders...',
   'Measuring waist & hips...',
   'Measuring arms & thighs...',
   'Analyzing body composition...',
-  'Processing scan data...',
+  'Computing fat distribution...',
   'Calculating AI score...',
   'Finalizing measurements...',
   'Scan complete!',
 ];
 
-function generateScanResult(): Omit<ScanRecord, 'id' | 'date'> {
+type PhotoState = {
+  frontUri: string;
+  frontBase64: string;
+  sideUri?: string;
+  sideBase64?: string;
+};
+
+function fallbackResult(weight: number, height: number): Omit<ScanRecord, 'id' | 'date'> {
   const j = (b: number, r: number) => parseFloat((b + (Math.random() - 0.5) * r).toFixed(1));
+  const bmi = parseFloat((weight / Math.pow(height / 100, 2)).toFixed(1));
   const measurements: BodyMeasurement = {
-    chest: j(97, 3),
-    waist: j(82, 4),
-    hips: j(96, 3),
-    leftArm: j(36, 2),
-    rightArm: j(36.5, 2),
-    leftThigh: j(59, 3),
-    rightThigh: j(58.5, 3),
-    neck: j(38.5, 1.5),
-    shoulders: j(123, 3),
-    bodyFat: j(16.5, 2),
-    muscleMass: j(43, 2),
+    chest: j(97, 3), waist: j(82, 4), hips: j(96, 3),
+    leftArm: j(36, 2), rightArm: j(36.5, 2),
+    leftThigh: j(59, 3), rightThigh: j(58.5, 3),
+    neck: j(38.5, 1.5), shoulders: j(123, 3),
+    bodyFat: j(16.5, 2), muscleMass: j(43, 2),
   };
-  const weight = j(80, 2);
-  const bmi = parseFloat((weight / (1.78 * 1.78)).toFixed(1));
-  const score = Math.floor(78 + Math.random() * 12);
-  return { measurements, weight, bmi, score };
+  return { measurements, weight, bmi, score: Math.floor(78 + Math.random() * 12) };
 }
 
-// Animated counter for result numbers
 function AnimatedNumber({ value, unit, duration = 800 }: { value: number; unit?: string; duration?: number }) {
   const anim = useRef(new Animated.Value(0)).current;
   const [display, setDisplay] = useState('0');
+  const colors = useColors();
 
   useEffect(() => {
     anim.setValue(0);
     Animated.timing(anim, {
-      toValue: value,
-      duration,
+      toValue: value, duration,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-
-    const listener = anim.addListener(({ value: v }) => {
-      setDisplay(v.toFixed(1));
-    });
+    const listener = anim.addListener(({ value: v }) => setDisplay(v.toFixed(1)));
     return () => anim.removeListener(listener);
   }, [value]);
 
-  const colors = useColors();
   return (
     <Text style={[styles.resultMetricValue, { color: colors.foreground }]}>
       {display}{unit}
@@ -81,40 +80,147 @@ function AnimatedNumber({ value, unit, duration = 800 }: { value: number; unit?:
 export default function ScanScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { addScan } = useApp();
-  const [scanState, setScanState] = useState<'idle' | 'scanning' | 'complete'>('idle');
+  const { addScan, profile } = useApp();
+
+  const [scanState, setScanState] = useState<'idle' | 'photo' | 'scanning' | 'complete' | 'error'>('idle');
+  const [photos, setPhotos] = useState<PhotoState | null>(null);
   const [progress, setProgress] = useState(0);
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [result, setResult] = useState<Omit<ScanRecord, 'id' | 'date'> | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [aiInsights, setAiInsights] = useState<string[]>([]);
+  const [isAiScan, setIsAiScan] = useState(false);
+
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const apiResultRef = useRef<Omit<ScanRecord, 'id' | 'date'> | null>(null);
 
-  // Result panel slide-up
   const resultSlide = useRef(new Animated.Value(SCREEN_H)).current;
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const headerOpacity = useRef(new Animated.Value(1)).current;
   const btnScale = useRef(new Animated.Value(1)).current;
+  const photoPreviewOpacity = useRef(new Animated.Value(0)).current;
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 84;
 
-  function startScan() {
-    setScanState('scanning');
-    setProgress(0);
-    setPhaseIndex(0);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  async function requestCameraPermission(): Promise<boolean> {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Camera Permission Required',
+        'Sik AI needs camera access to capture your body scan photo. Please enable it in Settings.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+    return true;
+  }
 
-    // Fade header slightly
-    Animated.timing(headerOpacity, { toValue: 0.6, duration: 400, useNativeDriver: true }).start();
+  async function takeFrontPhoto() {
+    const granted = await requestCameraPermission();
+    if (!granted) return;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: 'images',
+      allowsEditing: false,
+      quality: 0.7,
+      base64: true,
+      exif: false,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setPhotos({
+        frontUri: asset.uri,
+        frontBase64: asset.base64 ?? '',
+      });
+      setScanState('photo');
+      Animated.timing(photoPreviewOpacity, {
+        toValue: 1, duration: 400, useNativeDriver: true,
+      }).start();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  }
+
+  async function takeSidePhoto() {
+    const granted = await requestCameraPermission();
+    if (!granted) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: 'images',
+      allowsEditing: false,
+      quality: 0.7,
+      base64: true,
+      exif: false,
+    });
+
+    if (!result.canceled && result.assets[0] && photos) {
+      const asset = result.assets[0];
+      setPhotos(prev => prev ? {
+        ...prev,
+        sideUri: asset.uri,
+        sideBase64: asset.base64 ?? '',
+      } : prev);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+  }
+
+  async function callScanAPI(photoData: PhotoState): Promise<Omit<ScanRecord, 'id' | 'date'> | null> {
+    try {
+      const body = {
+        frontImage: photoData.frontBase64,
+        sideImage: photoData.sideBase64 || undefined,
+        profile: {
+          height: profile.height,
+          weight: profile.weight,
+          age: profile.age,
+          gender: profile.gender,
+          goal: profile.goal,
+        },
+      };
+
+      const response = await fetch(`${API_BASE}/api/scan/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.warn('Scan API error:', err);
+        return null;
+      }
+
+      const data = await response.json();
+      return {
+        measurements: data.measurements,
+        weight: data.weight,
+        bmi: data.bmi,
+        score: data.score,
+      };
+    } catch (e) {
+      console.warn('Scan API fetch error:', e);
+      return null;
+    }
+  }
+
+  function runProgressAnimation(onComplete: () => void) {
     let p = 0;
     progressRef.current = setInterval(() => {
-      p += 0.55 + Math.random() * 0.35;
+      // Slow at 85% — wait for API response
+      const increment = p < 85
+        ? 0.65 + Math.random() * 0.45
+        : apiResultRef.current ? 1.5 : 0.15;
+
+      p += increment;
       if (p >= 100) {
         p = 100;
         clearInterval(progressRef.current!);
         setProgress(100);
-        setTimeout(() => completeScan(), 400);
+        setTimeout(onComplete, 300);
       } else {
         setProgress(p);
       }
@@ -128,34 +234,53 @@ export default function ScanScreen() {
     }, 1000);
   }
 
-  function completeScan() {
+  function showResults(scanResult: Omit<ScanRecord, 'id' | 'date'>, isAI: boolean, insights: string[]) {
     clearInterval(progressRef.current!);
     clearInterval(phaseRef.current!);
     setPhaseIndex(SCAN_PHASES.length - 1);
-    const scanResult = generateScanResult();
     setResult(scanResult);
+    setAiInsights(insights);
+    setIsAiScan(isAI);
     setScanState('complete');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Animate result panel in
     Animated.parallel([
-      Animated.spring(resultSlide, {
-        toValue: 0,
-        tension: 55,
-        friction: 12,
-        useNativeDriver: true,
-      }),
-      Animated.timing(resultOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
+      Animated.spring(resultSlide, { toValue: 0, tension: 55, friction: 12, useNativeDriver: true }),
+      Animated.timing(resultOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
     ]).start();
+  }
+
+  async function startScan() {
+    if (!photos) return;
+    setScanState('scanning');
+    setProgress(0);
+    setPhaseIndex(0);
+    apiResultRef.current = null;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Animated.timing(headerOpacity, { toValue: 0.6, duration: 400, useNativeDriver: true }).start();
+
+    // Start API call and animation in parallel
+    const [apiResult] = await Promise.all([
+      callScanAPI(photos).then(r => {
+        apiResultRef.current = r;
+        return r;
+      }),
+      // Animation runs independently — it just slows at 85% until API responds
+      new Promise<void>(resolve => runProgressAnimation(resolve)),
+    ]);
+
+    // Use AI result or fall back
+    const finalResult = apiResult ?? fallbackResult(profile.weight, profile.height);
+    const isAI = apiResult !== null;
+    const insights: string[] = (apiResult as (typeof apiResult & { insights?: string[] }) | null)?.insights ?? [];
+
+    // If animation finished before API (rare), show results now
+    // If API finished before animation, it already released the 85% gate
+    showResults(finalResult, isAI, insights);
   }
 
   async function saveScan() {
     if (!result) return;
-    // Button press animation
     Animated.sequence([
       Animated.timing(btnScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.timing(btnScale, { toValue: 1, duration: 80, useNativeDriver: true }),
@@ -171,13 +296,20 @@ export default function ScanScreen() {
   }
 
   function resetScan() {
+    clearInterval(progressRef.current!);
+    clearInterval(phaseRef.current!);
     setScanState('idle');
     setProgress(0);
     setPhaseIndex(0);
     setResult(null);
+    setPhotos(null);
+    setAiInsights([]);
+    setIsAiScan(false);
+    apiResultRef.current = null;
     resultSlide.setValue(SCREEN_H);
     resultOpacity.setValue(0);
     headerOpacity.setValue(1);
+    photoPreviewOpacity.setValue(0);
   }
 
   useEffect(() => {
@@ -213,45 +345,77 @@ export default function ScanScreen() {
       <Animated.View style={[styles.header, { paddingTop: topPad + 8, opacity: headerOpacity }]}>
         <View>
           <Text style={styles.headerTitle}>Body Scan</Text>
-          <Text style={styles.headerSub}>LiDAR · DEPTH SENSING · AI</Text>
+          <Text style={styles.headerSub}>CAMERA · AI VISION · DEPTH</Text>
         </View>
         <View style={styles.headerRight}>
           <View style={styles.lidarPill}>
-            <View style={[styles.lidarDot, { backgroundColor: scanState === 'scanning' ? colors.emerald : 'rgba(16,185,129,0.3)' }]} />
+            <View style={[styles.lidarDot, {
+              backgroundColor: scanState === 'scanning' ? colors.emerald : 'rgba(16,185,129,0.3)'
+            }]} />
             <Text style={styles.lidarText}>
-              {scanState === 'scanning' ? 'SCANNING' : scanState === 'complete' ? 'COMPLETE' : 'READY'}
+              {scanState === 'scanning' ? 'ANALYZING' : scanState === 'complete' ? 'COMPLETE' : 'READY'}
             </Text>
           </View>
         </View>
       </Animated.View>
 
-      {/* Full-screen scanner */}
+      {/* Full-screen scanner visualization */}
       <View style={styles.scanArea}>
         <LiDARScanner
           isScanning={scanState === 'scanning'}
-          isIdle={scanState === 'idle'}
+          isIdle={scanState === 'idle' || scanState === 'photo'}
           progress={progress}
           phase={SCAN_PHASES[phaseIndex]}
         />
       </View>
 
-      {/* Idle start button */}
+      {/* Photo preview overlay (idle/photo state) */}
+      {photos && (scanState === 'idle' || scanState === 'photo') && (
+        <Animated.View style={[styles.photoPreviewOverlay, { opacity: photoPreviewOpacity }]}>
+          <Image source={{ uri: photos.frontUri }} style={styles.photoThumb} />
+          {photos.sideUri && (
+            <Image source={{ uri: photos.sideUri }} style={styles.photoThumb} />
+          )}
+        </Animated.View>
+      )}
+
+      {/* Idle state — no photos taken yet */}
       {scanState === 'idle' && (
         <View style={[styles.footer, { paddingBottom: bottomPad }]}>
           <View style={styles.idleInstructions}>
             <Feather name="info" size={13} color="rgba(16,185,129,0.5)" />
             <Text style={styles.idleInstructionText}>
-              Stand 1–2m from device · Keep arms slightly away from body
+              Stand 1–2m away · Arms slightly out · Good lighting
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.startBtn}
-            onPress={startScan}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={styles.cameraBtn} onPress={takeFrontPhoto} activeOpacity={0.85}>
             <View style={styles.startBtnInner}>
-              <Feather name="maximize" size={20} color="#fff" />
-              <Text style={styles.startBtnText}>Start LiDAR Scan</Text>
+              <Feather name="camera" size={20} color="#fff" />
+              <Text style={styles.startBtnText}>Take Front Photo</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Photo taken — ready to scan + optional side photo */}
+      {scanState === 'photo' && (
+        <View style={[styles.footer, { paddingBottom: bottomPad }]}>
+          <View style={styles.photoActions}>
+            <TouchableOpacity style={styles.sidePhotoBtn} onPress={takeSidePhoto} activeOpacity={0.85}>
+              <Feather name="camera" size={15} color="rgba(16,185,129,0.8)" />
+              <Text style={styles.sidePhotoBtnText}>
+                {photos?.sideUri ? '✓ Side Photo' : '+ Side Photo'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.retakeBtn} onPress={resetScan} activeOpacity={0.85}>
+              <Feather name="refresh-ccw" size={15} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.retakeBtnText}>Retake</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.startBtn} onPress={startScan} activeOpacity={0.85}>
+            <View style={styles.startBtnInner}>
+              <Feather name="zap" size={20} color="#fff" />
+              <Text style={styles.startBtnText}>Analyze with AI</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -264,21 +428,18 @@ export default function ScanScreen() {
             <View style={styles.scanningBarDot}>
               <View style={[styles.pulsingDot, { backgroundColor: colors.emerald }]} />
             </View>
-            <Text style={styles.scanningBarText}>Hold still · Keep breathing normally</Text>
+            <Text style={styles.scanningBarText}>AI analyzing your photo…</Text>
           </View>
         </View>
       )}
 
-      {/* Results panel — slides up from bottom */}
+      {/* Results panel */}
       {scanState === 'complete' && result && (
         <Animated.View
-          style={[
-            styles.resultsPanel,
-            {
-              transform: [{ translateY: resultSlide }],
-              opacity: resultOpacity,
-            },
-          ]}
+          style={[styles.resultsPanel, {
+            transform: [{ translateY: resultSlide }],
+            opacity: resultOpacity,
+          }]}
         >
           <ScrollView
             style={{ flex: 1 }}
@@ -286,8 +447,17 @@ export default function ScanScreen() {
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            {/* Drag handle */}
             <View style={styles.dragHandle} />
+
+            {/* AI badge */}
+            {isAiScan && (
+              <View style={styles.aiBadgeRow}>
+                <View style={styles.aiBadge}>
+                  <Feather name="zap" size={11} color={colors.emerald} />
+                  <Text style={styles.aiBadgeText}>AI Vision Analysis</Text>
+                </View>
+              </View>
+            )}
 
             {/* Score hero */}
             <View style={styles.scoreHero}>
@@ -295,27 +465,26 @@ export default function ScanScreen() {
                 <Text style={[styles.scoreNumber, { color: scoreColor }]}>{result.score}</Text>
                 <Text style={styles.scoreLabel}>BODY SCORE</Text>
               </View>
-
               <View style={styles.scoreMeta}>
                 <View style={styles.scoreMetaItem}>
                   <Text style={styles.scoreMetaValue}>{result.weight}kg</Text>
                   <Text style={styles.scoreMetaLabel}>Weight</Text>
                 </View>
-                <View style={[styles.scoreMetaDivider]} />
+                <View style={styles.scoreMetaDivider} />
                 <View style={styles.scoreMetaItem}>
                   <Text style={[styles.scoreMetaValue, { color: colors.emerald }]}>
                     {result.measurements.bodyFat.toFixed(1)}%
                   </Text>
                   <Text style={styles.scoreMetaLabel}>Body Fat</Text>
                 </View>
-                <View style={[styles.scoreMetaDivider]} />
+                <View style={styles.scoreMetaDivider} />
                 <View style={styles.scoreMetaItem}>
                   <Text style={[styles.scoreMetaValue, { color: colors.chartBlue }]}>
                     {result.measurements.muscleMass.toFixed(1)}kg
                   </Text>
                   <Text style={styles.scoreMetaLabel}>Muscle</Text>
                 </View>
-                <View style={[styles.scoreMetaDivider]} />
+                <View style={styles.scoreMetaDivider} />
                 <View style={styles.scoreMetaItem}>
                   <Text style={styles.scoreMetaValue}>{result.bmi}</Text>
                   <Text style={styles.scoreMetaLabel}>BMI</Text>
@@ -323,7 +492,20 @@ export default function ScanScreen() {
               </View>
             </View>
 
-            {/* Section title */}
+            {/* AI Insights */}
+            {aiInsights.length > 0 && (
+              <View style={styles.insightsSection}>
+                <Text style={styles.insightsTitle}>AI Insights</Text>
+                {aiInsights.map((insight, i) => (
+                  <View key={i} style={styles.insightRow}>
+                    <View style={styles.insightDot} />
+                    <Text style={styles.insightText}>{insight}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Measurements */}
             <View style={styles.measurementsTitleRow}>
               <Text style={styles.measurementsTitle}>All Measurements</Text>
               <View style={styles.measurementCount}>
@@ -331,15 +513,11 @@ export default function ScanScreen() {
               </View>
             </View>
 
-            {/* Measurements list */}
             <View style={styles.measurementsList}>
               {SUMMARY_ROWS.map((row, i) => (
                 <View
                   key={row.label}
-                  style={[
-                    styles.measurementRow,
-                    i < SUMMARY_ROWS.length - 1 && styles.measurementRowBorder,
-                  ]}
+                  style={[styles.measurementRow, i < SUMMARY_ROWS.length - 1 && styles.measurementRowBorder]}
                 >
                   <View style={styles.measurementRowLeft}>
                     <View style={[styles.measurementDot, {
@@ -360,9 +538,7 @@ export default function ScanScreen() {
                     <Text style={styles.measurementLabel}>{row.label}</Text>
                   </View>
                   <View style={styles.measurementValueRow}>
-                    <Text style={styles.measurementValue}>
-                      {row.value.toFixed(1)}
-                    </Text>
+                    <Text style={styles.measurementValue}>{row.value.toFixed(1)}</Text>
                     <Text style={styles.measurementUnit}>{row.unit}</Text>
                   </View>
                 </View>
@@ -371,20 +547,12 @@ export default function ScanScreen() {
 
             {/* Action buttons */}
             <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={styles.rescanBtn}
-                onPress={resetScan}
-              >
+              <TouchableOpacity style={styles.rescanBtn} onPress={resetScan}>
                 <Feather name="refresh-ccw" size={16} color="rgba(255,255,255,0.6)" />
                 <Text style={styles.rescanBtnText}>Rescan</Text>
               </TouchableOpacity>
-
               <Animated.View style={[styles.saveWrapper, { transform: [{ scale: btnScale }] }]}>
-                <TouchableOpacity
-                  style={styles.saveBtn}
-                  onPress={saveScan}
-                  activeOpacity={0.88}
-                >
+                <TouchableOpacity style={styles.saveBtn} onPress={saveScan} activeOpacity={0.88}>
                   <Feather name="save" size={18} color="#fff" />
                   <Text style={styles.saveBtnText}>Save Scan</Text>
                 </TouchableOpacity>
@@ -404,326 +572,172 @@ const BORDER = '#1e2e26';
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+    paddingHorizontal: 20, paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: -0.5,
-  },
-  headerSub: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: 'rgba(16,185,129,0.5)',
-    letterSpacing: 1.5,
-    marginTop: 2,
-  },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  headerSub: { fontSize: 9, fontWeight: '600', color: 'rgba(16,185,129,0.5)', letterSpacing: 1.5, marginTop: 2 },
   headerRight: { alignItems: 'flex-end' },
   lidarPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(16,185,129,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(16,185,129,0.08)', borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
   },
   lidarDot: { width: 5, height: 5, borderRadius: 2.5 },
-  lidarText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: E,
-    letterSpacing: 1.2,
-  },
+  lidarText: { fontSize: 9, fontWeight: '800', color: E, letterSpacing: 1.2 },
   scanArea: { flex: 1 },
+
+  // Photo preview
+  photoPreviewOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: 'flex-end', alignItems: 'flex-start',
+    paddingLeft: 16, paddingBottom: 180, gap: 8, flexDirection: 'row',
+    paddingHorizontal: 16, pointerEvents: 'none',
+  },
+  photoThumb: {
+    width: 70, height: 100, borderRadius: 12,
+    borderWidth: 1.5, borderColor: E + '60',
+    opacity: 0.85,
+  },
+
+  // Footer
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    gap: 10,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 20, paddingTop: 12, gap: 10,
   },
   idleInstructions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
   },
-  idleInstructionText: {
-    fontSize: 11,
-    color: 'rgba(16,185,129,0.5)',
-    textAlign: 'center',
-    fontWeight: '500',
+  idleInstructionText: { fontSize: 11, color: 'rgba(16,185,129,0.5)', textAlign: 'center', fontWeight: '500' },
+  cameraBtn: {
+    borderRadius: 18, overflow: 'hidden', backgroundColor: E,
+    shadowColor: E, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 8,
   },
   startBtn: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: E,
-    shadowColor: E,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
+    borderRadius: 18, overflow: 'hidden', backgroundColor: E,
+    shadowColor: E, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 8,
   },
   startBtnInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 17,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 10, paddingVertical: 17,
   },
   startBtnText: { fontSize: 17, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
+
+  // Photo state actions
+  photoActions: { flexDirection: 'row', gap: 10 },
+  sidePhotoBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 13, borderRadius: 14,
+    backgroundColor: 'rgba(16,185,129,0.08)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)',
+  },
+  sidePhotoBtnText: { fontSize: 13, fontWeight: '600', color: 'rgba(16,185,129,0.9)' },
+  retakeBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 13, paddingHorizontal: 18, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: BORDER,
+  },
+  retakeBtnText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.5)' },
+
+  // Scanning
   scanningBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: 'rgba(16,185,129,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.15)',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    paddingVertical: 14, borderRadius: 14,
+    backgroundColor: 'rgba(16,185,129,0.06)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.15)',
   },
   scanningBarDot: { alignItems: 'center', justifyContent: 'center' },
   pulsingDot: { width: 7, height: 7, borderRadius: 3.5 },
-  scanningBarText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.6)',
-  },
+  scanningBarText: { fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.6)' },
 
   // Results panel
   resultsPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_H * 0.72,
-    backgroundColor: CARD,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderTopWidth: 1,
-    borderColor: BORDER,
-    overflow: 'hidden',
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    height: SCREEN_H * 0.78, backgroundColor: CARD,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    borderTopWidth: 1, borderColor: BORDER, overflow: 'hidden',
   },
   dragHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 6,
+    width: 36, height: 4, backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 6,
   },
 
+  // AI badge
+  aiBadgeRow: { alignItems: 'center', marginBottom: 4 },
+  aiBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(16,185,129,0.1)', paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: 20, borderWidth: 1, borderColor: 'rgba(16,185,129,0.2)',
+  },
+  aiBadgeText: { fontSize: 11, fontWeight: '700', color: E, letterSpacing: 0.5 },
+
   // Score hero
-  scoreHero: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    alignItems: 'center',
-    gap: 14,
-  },
+  scoreHero: { paddingHorizontal: 20, paddingVertical: 14, alignItems: 'center', gap: 14 },
   scoreBadge: {
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    backgroundColor: 'rgba(16,185,129,0.06)',
+    alignItems: 'center', borderWidth: 1, borderRadius: 20,
+    paddingHorizontal: 32, paddingVertical: 14, backgroundColor: 'rgba(16,185,129,0.06)',
   },
-  scoreNumber: {
-    fontSize: 56,
-    fontWeight: '900',
-    letterSpacing: -2,
-    lineHeight: 60,
-  },
-  scoreLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.35)',
-    letterSpacing: 2.5,
-    marginTop: 2,
-  },
+  scoreNumber: { fontSize: 56, fontWeight: '900', letterSpacing: -2, lineHeight: 60 },
+  scoreLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.35)', letterSpacing: 2.5, marginTop: 2 },
   scoreMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    width: '100%',
-    gap: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, borderWidth: 1,
+    borderColor: BORDER, paddingVertical: 12, paddingHorizontal: 8, width: '100%', gap: 0,
   },
-  scoreMetaItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
+  scoreMetaItem: { flex: 1, alignItems: 'center', gap: 4 },
+  scoreMetaValue: { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  scoreMetaLabel: { fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
+  scoreMetaDivider: { width: 1, height: 32, backgroundColor: BORDER },
+
+  // AI Insights
+  insightsSection: {
+    marginHorizontal: 16, marginBottom: 12, padding: 14,
+    backgroundColor: 'rgba(16,185,129,0.05)', borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(16,185,129,0.15)',
   },
-  scoreMetaValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: -0.5,
-  },
-  scoreMetaLabel: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.35)',
-    fontWeight: '500',
-  },
-  scoreMetaDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: BORDER,
-  },
+  insightsTitle: { fontSize: 12, fontWeight: '700', color: E, letterSpacing: 1, marginBottom: 10 },
+  insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 8 },
+  insightDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: E, marginTop: 5, flexShrink: 0 },
+  insightText: { fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 18, flex: 1 },
 
   // Measurements
   measurementsTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, marginBottom: 8,
   },
-  measurementsTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: -0.2,
-  },
-  measurementCount: {
-    backgroundColor: 'rgba(16,185,129,0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  measurementCountText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: E,
-  },
+  measurementsTitle: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: -0.2 },
+  measurementCount: { backgroundColor: 'rgba(16,185,129,0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  measurementCountText: { fontSize: 10, fontWeight: '700', color: E },
   measurementsList: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BORDER,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    overflow: 'hidden',
-    marginBottom: 16,
+    marginHorizontal: 16, borderRadius: 16, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: 'rgba(255,255,255,0.02)', overflow: 'hidden', marginBottom: 16,
   },
   measurementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 11,
   },
-  measurementRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-  },
-  measurementRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  measurementDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  measurementDotInner: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  measurementLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.75)',
-  },
-  measurementValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-  },
-  measurementValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: -0.3,
-  },
-  measurementUnit: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.35)',
-    fontWeight: '500',
-  },
-  resultMetricValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  measurementRowBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
+  measurementRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  measurementDot: { width: 22, height: 22, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  measurementDotInner: { width: 7, height: 7, borderRadius: 3.5 },
+  measurementLabel: { fontSize: 14, fontWeight: '500', color: 'rgba(255,255,255,0.75)' },
+  measurementValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
+  measurementValue: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: -0.3 },
+  measurementUnit: { fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
+  resultMetricValue: { fontSize: 16, fontWeight: '700' },
 
   // Action buttons
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-  },
+  actionButtons: { flexDirection: 'row', gap: 10, paddingHorizontal: 16 },
   rescanBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: BORDER,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 15, paddingHorizontal: 20, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: BORDER,
   },
-  rescanBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
-  },
+  rescanBtnText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
   saveWrapper: { flex: 1 },
   saveBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 15,
-    borderRadius: 16,
-    backgroundColor: E,
-    shadowColor: E,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 8,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 15, borderRadius: 16, backgroundColor: E,
+    shadowColor: E, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 14, elevation: 8,
   },
-  saveBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: -0.2,
-  },
+  saveBtnText: { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: -0.2 },
 });
