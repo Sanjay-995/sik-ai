@@ -52,6 +52,8 @@ export default function OnboardingScreen() {
   const totalSteps = STEPS.length + 1;
   const progress = step / (totalSteps - 1);
 
+  const isFormValid = name.trim() !== '' && age.trim() !== '' && height.trim() !== '' && weight.trim() !== '';
+
   async function handleComplete() {
     await updateProfile({
       name: name || 'Alex Johnson',
@@ -169,11 +171,9 @@ export default function OnboardingScreen() {
                   ]}
                   onPress={() => setGender(g)}
                 >
-                  <Feather
-                    name={g === 'male' ? 'user' : 'user'}
-                    size={16}
-                    color={gender === g ? colors.emerald : colors.textSecondary}
-                  />
+                  <Text style={{ fontSize: 18, lineHeight: 22 }}>
+                    {g === 'male' ? '♂' : '♀'}
+                  </Text>
                   <Text style={[styles.genderBtnText, { color: gender === g ? colors.emerald : colors.textSecondary }]}>
                     {g.charAt(0).toUpperCase() + g.slice(1)}
                   </Text>
@@ -193,10 +193,16 @@ export default function OnboardingScreen() {
                     {
                       backgroundColor: goal === g.id ? colors.emeraldGlow : colors.card,
                       borderColor: goal === g.id ? 'rgba(16,185,129,0.5)' : colors.border,
+                      position: 'relative',
                     },
                   ]}
                   onPress={() => setGoal(g.id)}
                 >
+                  {goal === g.id && (
+                    <View style={{ position: 'absolute', top: 6, right: 6 }}>
+                      <Feather name="check" size={12} color={colors.emerald} />
+                    </View>
+                  )}
                   <Feather name={g.icon as any} size={20} color={goal === g.id ? colors.emerald : colors.textSecondary} />
                   <Text style={[styles.goalBtnText, { color: goal === g.id ? colors.emerald : colors.foreground }]}>
                     {g.label}
@@ -212,7 +218,12 @@ export default function OnboardingScreen() {
 
       <View style={[styles.footer, { paddingBottom: bottomPad + 16 }]}>
         <TouchableOpacity
-          style={[styles.nextBtn, { backgroundColor: colors.emerald }]}
+          style={[
+            styles.nextBtn,
+            { backgroundColor: colors.emerald },
+            isProfileStep && !isFormValid && { opacity: 0.4 }
+          ]}
+          disabled={isProfileStep && !isFormValid}
           onPress={() => {
             if (step < STEPS.length - 1) setStep(s => s + 1);
             else if (step === STEPS.length - 1) setStep(STEPS.length);
