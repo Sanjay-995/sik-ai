@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface BodyMeasurement {
@@ -130,11 +130,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(defaultProfile);
   const [scanHistory, setScanHistory] = useState<ScanRecord[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const chatMessagesRef = useRef<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    chatMessagesRef.current = chatMessages;
+  }, [chatMessages]);
 
   async function loadData() {
     try {
@@ -174,11 +179,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function addChatMessage(msg: ChatMessage) {
-    setChatMessages(prev => {
-      const updated = [...prev, msg];
-      AsyncStorage.setItem('chatMessages', JSON.stringify(updated));
-      return updated;
-    });
+    const updated = [...chatMessagesRef.current, msg];
+    chatMessagesRef.current = updated;
+    setChatMessages(updated);
+    await AsyncStorage.setItem('chatMessages', JSON.stringify(updated));
   }
 
   async function clearChat() {
