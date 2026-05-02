@@ -1,6 +1,6 @@
 # Sik AI — Body Scanning & Measurement Tracker
 
-> A premium iOS fitness app that uses a simulated LiDAR body scanner to track 11 body measurements over time, powered by Expo / React Native with a stunning dark UI and emerald accent theme.
+> A premium iOS fitness app powered by GPT-4.1 Vision AI that scans your body through the camera, tracks 11 precise measurements over time, and coaches you with a personalized AI fitness guide. Built with Expo / React Native on a dark UI with an emerald accent theme.
 
 ---
 
@@ -10,6 +10,7 @@
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
 - [Screens](#screens)
+- [Scan Flow](#scan-flow)
 - [File Structure](#file-structure)
 - [Color Palette](#color-palette)
 - [Measurements Tracked](#measurements-tracked)
@@ -17,12 +18,13 @@
 - [Building for Production](#building-for-production)
 - [Project Configuration](#project-configuration)
 - [Data & Persistence](#data--persistence)
+- [API Server](#api-server)
 
 ---
 
 ## Overview
 
-Sik AI is a fully dark-themed iOS fitness application that simulates a LiDAR body scanner, tracks 11 body measurements, visualizes weekly progress, and provides an AI coaching interface. All data is stored locally using AsyncStorage — no backend or account required.
+Sik AI uses GPT-4.1 Vision to analyze camera photos and return real body measurements. It tracks 11 body metrics over time, visualizes progress with interactive charts, and provides an AI coaching interface. All profile and scan data is stored locally using AsyncStorage.
 
 | | |
 |---|---|
@@ -32,44 +34,57 @@ Sik AI is a fully dark-themed iOS fitness application that simulates a LiDAR bod
 | **Architecture** | New Architecture enabled (`newArchEnabled: true`) |
 | **Navigation** | Expo Router (file-based) — 5-tab layout |
 | **Theme** | Dark only (`userInterfaceStyle: dark`) |
+| **AI** | GPT-4.1 Vision via Express API server |
 
 ---
 
 ## Key Features
 
-### LiDAR Body Scanner
-- **500+ point cloud dots** fill a full-body silhouette rendered with React Native SVG
-- Dots reveal **top-to-bottom** driven by a `progress` prop (0–100)
-- **Glow band** highlights the recently-revealed frontier
-- Measurement **brackets** animate outward on key body zones (chest, waist, hips, arms)
-- HUD overlay with live measurement readouts
-- **Scan beam** — an `Animated.View` sweeping top-to-bottom over the body cloud
+### AI-Powered Body Scanner
+- Camera photo → GPT-4.1 Vision API → real body measurements in seconds
+- **Pre-scan checklist** modal with 5 environment tips before capture (lighting, distance, pose, clothing, camera height)
+- Optional front + side photo for improved accuracy
+- **LiDAR animation** during processing — 500+ point cloud dots over body silhouette with scan beam
+- **Confidence scores** on every measurement (e.g. `97.2 cm ±1.5`)
+- **Outlier detection** — warns when any measurement deviates >5 cm / >5% / >5 kg from your previous scan
+- Graceful fallback to generated data if AI is unavailable
 
-### Camera Background Simulation
-- 380+ **static noise pixels** that shift position every 80 ms
-- Horizontal **scan lines** every 3 px
-- **Radial vignette** darkened at edges
-- Top/bottom **gradient fade** to transparent
-- **Camera flicker** effect and night-vision tint during active scanning
+### Units System
+- Full **metric ↔ imperial** toggle in Settings (cm/kg vs in/lbs)
+- All measurement displays app-wide update instantly — dashboard, scan results, history, profile card
+- Conversion is display-only; all data stored internally in metric
 
 ### Dashboard & Analytics
 - Fitness score ring (0–100) with animated arc
-- 8 weeks of **seeded mock data** for immediate visual richness
-- Weekly trend chart per measurement
-- Before/After **comparison view** with side-by-side body diagrams
-
-### AI Coach Tab
-- Conversational interface providing personalized insights
-- Recommendations derived from recent scan delta values
+- Body diagram with tappable zones showing live measurements
+- 8 weeks of seeded mock data for immediate visual richness
+- Key metric cards: Weight, Body Fat %, BMI, Muscle Mass
 
 ### Progress & History
-- Full scan history list sorted by date
-- Per-measurement progress charts (area/line with `react-native-svg`)
-- Percentage change badges (positive = green, negative = red)
+- Full scan history list sorted by date with expandable measurement rows
+- Per-measurement trend charts for all 10 metrics
+- 8-week summary with Weight Lost, Fat Lost, Muscle Gained, Score Improved
 
-### Paywall & Settings
-- Subscription paywall screen (UI only — ready for RevenueCat integration)
-- Settings screen: units (metric/imperial), notification preferences, data reset
+### Compare
+- Side-by-side Before/After comparison table for any two scans
+- Color-coded change column (green = improvement, red = regression)
+- Smart empty state when fewer than 2 scans exist
+
+### AI Coach
+- Conversational chat interface with AI fitness recommendations
+- Context-aware responses based on your latest scan data and goal
+- Inverted FlatList with keyboard-aware input (native iOS chat behavior)
+- Quick-question shortcuts for common queries
+
+### CSV Export
+- Export full scan history as a CSV file (15 columns per scan)
+- Uses native iOS Share sheet — save to Files, AirDrop, email, or any app
+
+### Paywall
+- 3-tier pricing: **Free** / **Pro** ($9.99/mo or $79.99/yr) / **Pro+** ($19.99/mo)
+- 7-day free trial badge
+- Free vs Pro feature comparison table
+- Pro+ extras card (HealthKit sync, PDF reports, Priority AI) when Pro+ is selected
 
 ---
 
@@ -83,12 +98,13 @@ Sik AI is a fully dark-themed iOS fitness application that simulates a LiDAR bod
 | Animations | react-native-reanimated | ~4.1.1 |
 | Charts/Graphics | react-native-svg | 15.12.1 |
 | Persistence | @react-native-async-storage/async-storage | 2.2.0 |
-| Gradients | expo-linear-gradient | ~15.0.8 |
+| Keyboard | react-native-keyboard-controller | latest |
+| Camera | expo-image-picker | ~16.1.4 |
 | Haptics | expo-haptics | ~15.0.8 |
-| State | React Context API | — |
+| Safe Area | react-native-safe-area-context | ~5.6.0 |
+| State | React Context API + AsyncStorage | — |
 | Fonts | @expo-google-fonts/inter | ^0.4.0 |
 | Gestures | react-native-gesture-handler | ~2.28.0 |
-| Safe Area | react-native-safe-area-context | ~5.6.0 |
 
 ---
 
@@ -96,15 +112,31 @@ Sik AI is a fully dark-themed iOS fitness application that simulates a LiDAR bod
 
 | Screen | File | Description |
 |--------|------|-------------|
-| Splash / Onboarding | `app/onboarding.tsx` | Animated intro with brand logo, value props, and CTA to start scanning |
-| Dashboard | `app/(tabs)/index.tsx` | Score ring, recent scan summary, quick-action cards |
-| Scan | `app/(tabs)/scan.tsx` | Full-screen immersive LiDAR scanner; slide-up results panel after scan |
-| AI Coach | `app/(tabs)/coach.tsx` | Chat-style coaching recommendations |
-| History | `app/(tabs)/history.tsx` | Chronological list of all past scans with thumbnails |
-| Progress | `app/(tabs)/progress.tsx` | Per-measurement trend charts over 8 weeks |
-| Compare | `app/compare.tsx` | Side-by-side before/after scan comparison |
-| Paywall | `app/paywall.tsx` | Premium subscription upsell screen |
-| Settings | `app/settings.tsx` | Units, notifications, data management |
+| Onboarding | `app/onboarding.tsx` | 3-step intro + profile setup (name, age, height, weight, goal, gender) |
+| Dashboard | `app/(tabs)/index.tsx` | Score ring, body diagram, key metrics, measurements grid, quick actions |
+| Scan | `app/(tabs)/scan.tsx` | Pre-scan checklist → camera → AI analysis → results with confidence scores |
+| AI Coach | `app/(tabs)/coach.tsx` | Chat-style AI coaching with context from your scans |
+| History | `app/(tabs)/history.tsx` | Chronological scan list with expandable detail rows |
+| Progress | `app/(tabs)/progress.tsx` | Per-measurement trend charts, 8-week summary grid |
+| Compare | `app/compare.tsx` | Side-by-side before/after scan comparison table |
+| Paywall | `app/paywall.tsx` | 3-tier subscription screen with trial badge |
+| Settings | `app/settings.tsx` | Profile, units toggle, notifications, CSV export, data reset |
+
+---
+
+## Scan Flow
+
+1. User taps **Take Front Photo** on the Scan tab
+2. **Pre-scan checklist modal** slides up with 5 environment tips
+3. User taps **I'm Ready** → `expo-image-picker` opens camera
+4. Optional: take a **side photo** for better accuracy
+5. Tap **Analyze with AI** → photos + profile sent to `POST /api/scan/analyze`
+6. **LiDAR animation** plays while the API processes (progress gates at 85% until response arrives)
+7. GPT-4.1 Vision analyzes photos + profile → returns real measurements
+8. **Results panel** slides up showing: score ring, body fat %, muscle mass, BMI, all 11 measurements with ±confidence, AI insights text
+9. **Outlier warning** banner appears if any measurement deviates significantly from the previous scan
+10. Tap **Save Scan** → stored to AsyncStorage scan history
+11. Fallback: if AI is unavailable, realistic values are generated from profile data
 
 ---
 
@@ -115,44 +147,45 @@ artifacts/sikai/
 ├── app/                          # Expo Router pages (file = route)
 │   ├── _layout.tsx               # Root layout — fonts, splash, AppContext provider
 │   ├── index.tsx                 # Redirects to /onboarding or /(tabs)
-│   ├── onboarding.tsx            # Onboarding flow
+│   ├── onboarding.tsx            # 4-step onboarding flow
 │   ├── compare.tsx               # Before/After comparison screen
-│   ├── paywall.tsx               # Subscription paywall
-│   ├── settings.tsx              # App settings
+│   ├── paywall.tsx               # 3-tier subscription paywall
+│   ├── settings.tsx              # App settings (units, notifications, export, reset)
 │   ├── +not-found.tsx            # 404 fallback
 │   └── (tabs)/                   # 5-tab navigator
-│       ├── _layout.tsx           # Tab bar config (icons, labels, colors)
+│       ├── _layout.tsx           # Tab bar — NativeTabs (iOS 26) + BlurView fallback
 │       ├── index.tsx             # Dashboard tab
-│       ├── scan.tsx              # Scan tab (main feature)
-│       ├── coach.tsx             # AI Coach tab
+│       ├── scan.tsx              # Scan tab (core AI feature)
+│       ├── coach.tsx             # AI Coach chat tab
 │       ├── history.tsx           # History tab
-│       └── progress.tsx          # Progress tab
+│       └── progress.tsx          # Progress charts tab
 │
 ├── components/                   # Shared UI components
-│   ├── LiDARScanner.tsx          # ★ Core scanner — 500+ dot point cloud, scan beam, HUD
+│   ├── LiDARScanner.tsx          # Core scanner — 500+ dot point cloud, scan beam, HUD
 │   ├── CameraBackground.tsx      # Camera simulation (noise, scanlines, vignette)
 │   ├── ARScanAnimation.tsx       # AR-style zone bracket animations
-│   ├── BodyDiagram.tsx           # Static body outline SVG diagram
+│   ├── BodyDiagram.tsx           # Tappable body outline SVG diagram
 │   ├── ScanScoreRing.tsx         # Animated circular score ring (0–100)
 │   ├── ProgressChart.tsx         # SVG area/line chart for measurement trends
-│   ├── MetricCard.tsx            # Single-measurement stat card
+│   ├── MetricCard.tsx            # Single-measurement stat card with change delta
 │   ├── GradientCard.tsx          # Reusable card with emerald gradient border
 │   ├── ErrorBoundary.tsx         # React error boundary wrapper
 │   ├── ErrorFallback.tsx         # Error UI fallback
 │   └── KeyboardAwareScrollViewCompat.tsx  # Cross-platform keyboard avoidance
 │
 ├── context/
-│   └── AppContext.tsx            # Global state — scans, measurements, 8-week seed data
+│   └── AppContext.tsx            # Global state — profile, scans, chat, seed data
+│
+├── hooks/
+│   ├── useColors.ts              # Returns active color scheme design tokens
+│   └── useUnits.ts               # Unit conversion helpers (metric ↔ imperial)
 │
 ├── constants/
 │   └── colors.ts                 # Full design token palette
 │
-├── hooks/
-│   └── useColors.ts              # Hook returning the active color scheme tokens
-│
 ├── assets/
 │   └── images/
-│       └── icon.png              # App icon (used for splash + home screen)
+│       └── icon.png              # App icon
 │
 ├── app.json                      # Expo config (bundle ID, permissions, plugins)
 ├── babel.config.js               # Babel config (React Compiler + Reanimated plugin)
@@ -172,10 +205,11 @@ All tokens live in `constants/colors.ts` and are consumed via the `useColors()` 
 | `background` | `#0A0A0A` | Screen backgrounds |
 | `card` | `#1A1A1A` | Card/panel backgrounds |
 | `surface` | `#141414` | Slightly elevated surfaces |
-| `emerald` / `primary` | `#10B981` | Primary accent — buttons, highlights, dots |
+| `emerald` | `#10B981` | Primary accent — buttons, highlights, active states |
 | `emeraldDim` | `#059669` | Pressed/secondary emerald |
-| `emeraldGlow` | `rgba(16,185,129,0.15)` | Glow halos around dots and rings |
+| `emeraldGlow` | `rgba(16,185,129,0.15)` | Glow halos, icon backgrounds |
 | `border` | `#2A2A2A` | Dividers and card edges |
+| `foreground` | `#F9FAFB` | Primary text |
 | `textSecondary` | `#9CA3AF` | Subtitles, labels |
 | `textTertiary` | `#4B5563` | Placeholder, muted text |
 | `chartBlue` | `#3B82F6` | Secondary chart series |
@@ -186,23 +220,23 @@ All tokens live in `constants/colors.ts` and are consumed via the `useColors()` 
 
 ## Measurements Tracked
 
-Sik AI tracks **11 body measurements** per scan, stored as numeric values in centimeters (or inches depending on user preference):
+Sik AI tracks **11 body measurements** per scan. All values stored in metric (cm/kg); displayed in metric or imperial based on user preference.
 
-| Key | Label |
-|-----|-------|
-| `chest` | Chest |
-| `waist` | Waist |
-| `hips` | Hips |
-| `leftArm` | Left Arm |
-| `rightArm` | Right Arm |
-| `leftThigh` | Left Thigh |
-| `rightThigh` | Right Thigh |
-| `neck` | Neck |
-| `shoulders` | Shoulders |
-| `bodyFat` | Body Fat % |
-| `muscleMass` | Muscle Mass % |
+| Key | Label | Unit |
+|-----|-------|------|
+| `chest` | Chest | cm / in |
+| `waist` | Waist | cm / in |
+| `hips` | Hips | cm / in |
+| `leftArm` | Left Arm | cm / in |
+| `rightArm` | Right Arm | cm / in |
+| `leftThigh` | Left Thigh | cm / in |
+| `rightThigh` | Right Thigh | cm / in |
+| `neck` | Neck | cm / in |
+| `shoulders` | Shoulders | cm / in |
+| `bodyFat` | Body Fat | % |
+| `muscleMass` | Muscle Mass | kg / lbs |
 
-Each scan record also includes: `id`, `date`, `score` (0–100), and `photoUri` (optional).
+Each scan record also includes: `id`, `date` (ISO 8601), `score` (0–100), `weight`, and `bmi`.
 
 ---
 
@@ -215,51 +249,35 @@ Each scan record also includes: `id`, `date`, `score` (0–100), and `photoUri` 
 | Node.js | 18+ | [nodejs.org](https://nodejs.org) |
 | pnpm | 9+ | `npm install -g pnpm` |
 | Expo Go app | Latest | [iOS App Store](https://apps.apple.com/app/expo-go/id982107779) |
-| Expo CLI | Installed via devDeps | — |
 
-### Step 1 — Clone the repo
+### Step 1 — Clone & install
 
 ```bash
 git clone https://github.com/Sanjay-995/sik-ai.git
 cd sik-ai
-```
-
-### Step 2 — Install dependencies
-
-This is a pnpm workspace. Run the install from the **repo root**:
-
-```bash
 pnpm install
 ```
 
-### Step 3 — Start the Expo dev server
-
-Navigate into the app directory and start the bundler:
+### Step 2 — Start the Expo dev server
 
 ```bash
 cd artifacts/sikai
 npx expo start
 ```
 
-Or from the repo root using the pnpm filter:
+Or from the repo root:
 
 ```bash
 pnpm --filter @workspace/sikai dev
 ```
 
-> The `dev` script in `package.json` passes several environment variables needed for the Replit hosting environment. When running **locally outside Replit**, use `npx expo start` directly inside `artifacts/sikai/` instead.
+### Step 3 — Open in Expo Go
 
-### Step 4 — Open in Expo Go
-
-1. Make sure your **phone and computer are on the same Wi-Fi network**
-2. Scan the **QR code** printed in the terminal with:
+1. Ensure your phone and computer are on the **same Wi-Fi network**
+2. Scan the **QR code** with:
    - **iOS**: Camera app → point at QR code → tap the Expo Go banner
    - **Android**: Open Expo Go → tap "Scan QR Code"
-3. The app will bundle and open in Expo Go in ~15–30 seconds
-
-### Step 5 — Hot reload
-
-Any file change in `artifacts/sikai/` will trigger a **fast refresh** automatically — no need to restart the server.
+3. App bundles and opens in ~15–30 seconds
 
 ### Useful Expo CLI flags
 
@@ -267,13 +285,13 @@ Any file change in `artifacts/sikai/` will trigger a **fast refresh** automatica
 # Clear Metro cache (fixes most "module not found" errors)
 npx expo start --clear
 
-# Open in iOS Simulator (requires Xcode + macOS)
+# iOS Simulator (requires Xcode + macOS)
 npx expo start --ios
 
-# Open in Android emulator (requires Android Studio)
+# Android emulator (requires Android Studio)
 npx expo start --android
 
-# Open in browser (limited — some native modules won't work)
+# Browser preview (limited — some native modules won't work)
 npx expo start --web
 ```
 
@@ -281,43 +299,22 @@ npx expo start --web
 
 ## Building for Production
 
-### EAS Build (recommended)
-
-[EAS Build](https://docs.expo.dev/build/introduction/) is Expo's managed cloud build service — no local Xcode required.
+Production builds are handled via **Replit Expo Launch** (App Store / iOS only). To build manually with EAS:
 
 ```bash
-# Install EAS CLI globally
 npm install -g eas-cli
-
-# Log in to your Expo account
 eas login
-
-# Configure your project (first time only)
 cd artifacts/sikai
 eas build:configure
 
-# Build a development client (for testing on device)
+# Development build (for testing on device)
 eas build --profile development --platform ios
 
-# Build for the App Store
+# App Store build
 eas build --profile production --platform ios
 ```
 
-> Make sure the `bundleIdentifier` in `app.json` (`com.sikai.bodyscanner`) matches your Apple Developer account App ID.
-
-### Local iOS Build (requires macOS + Xcode 15+)
-
-```bash
-cd artifacts/sikai
-
-# Generate the native ios/ directory
-npx expo prebuild --platform ios --clean
-
-# Open in Xcode
-open ios/SikAI.xcworkspace
-```
-
-Then select your device/simulator and press **Run** (⌘R) in Xcode.
+> Ensure the `bundleIdentifier` in `app.json` (`com.sikai.bodyscanner`) matches your Apple Developer App ID.
 
 ---
 
@@ -343,48 +340,65 @@ Then select your device/simulator and press **Run** (⌘R) in Xcode.
 }
 ```
 
-### Babel config
+### Tab navigation
 
-Located at `babel.config.js`. Includes:
-- **`babel-plugin-react-compiler`** — experimental React Compiler for automatic memoization
-- **`react-native-reanimated/plugin`** — required for Reanimated 3 worklets
-
-### Metro config
-
-Located at `metro.config.js`. Standard Expo Metro config with SVG transformer support via `react-native-svg`.
+The tab bar supports two modes selected at runtime:
+- **NativeTabs** (iOS 26+) — uses `expo-router/unstable-native-tabs` with SF Symbols and liquid glass tab bar
+- **Classic Tabs** — Expo Router `Tabs` with `BlurView` frosted glass background (iOS < 26 and Android)
 
 ---
 
 ## Data & Persistence
 
-All data is stored **100% on-device** using `@react-native-async-storage/async-storage`. There is no backend, no API, and no account required.
+All data is stored **100% on-device** using `@react-native-async-storage/async-storage`. No account or internet connection required to use the app (AI scan analysis requires a connection).
 
 ### `AppContext` (`context/AppContext.tsx`)
 
-The single global context provider wraps the entire app and exposes:
+The global context provider exposes:
 
 ```ts
 {
-  scans: Scan[];              // All past scans, sorted newest-first
-  addScan: (s: Scan) => void; // Save a new scan + persist to AsyncStorage
-  latestScan: Scan | null;    // Most recent scan (or null)
-  weeklyData: WeeklyData[];   // 8 weeks of trend data per measurement
+  profile: UserProfile;              // Name, age, height, weight, goal, gender, units, isPro
+  updateProfile: (p) => Promise<void>;
+  scanHistory: ScanRecord[];         // All scans, newest-first
+  addScan: (s) => Promise<void>;     // Save a scan to AsyncStorage
+  latestScan: ScanRecord | null;
+  previousScan: ScanRecord | null;
+  chatMessages: ChatMessage[];       // AI coach conversation history
+  addChatMessage: (m) => Promise<void>;
+  clearChat: () => Promise<void>;
 }
 ```
 
+### `useUnits` hook (`hooks/useUnits.ts`)
+
+Reads `profile.units` and returns conversion helpers:
+
+```ts
+const { fmtLen, fmtWt, fmtHt, convertLen, convertWt, lenUnit, wtUnit } = useUnits();
+
+fmtLen(97.5)   // "97.5 cm"  or  "38.4 in"
+fmtWt(82)      // "82.0 kg"  or  "180.8 lbs"
+fmtHt(178)     // "178 cm"   or  "5'10\""
+```
+
+All storage stays in metric (cm/kg). Conversion is display-only.
+
 ### Seeded mock data
 
-On first launch, `AppContext` seeds **8 weeks of realistic scan data** so every chart and history screen shows meaningful content immediately — no real scanning needed to evaluate the UI.
+On first launch, `AppContext` seeds **8 weeks of realistic scan data** so every chart and history screen shows meaningful content immediately.
 
 ### Scan data shape
 
 ```ts
-type Scan = {
+type ScanRecord = {
   id: string;
-  date: string;                // ISO 8601
-  score: number;               // 0–100 fitness score
+  date: string;             // ISO 8601
+  score: number;            // 0–100 fitness score
+  weight: number;           // kg
+  bmi: number;
   measurements: {
-    chest: number;
+    chest: number;          // cm
     waist: number;
     hips: number;
     leftArm: number;
@@ -393,24 +407,60 @@ type Scan = {
     rightThigh: number;
     neck: number;
     shoulders: number;
-    bodyFat: number;           // percentage
-    muscleMass: number;        // percentage
+    bodyFat: number;        // percentage
+    muscleMass: number;     // kg
   };
-  photoUri?: string;
 };
 ```
 
 ---
 
-## Planned Integrations
+## API Server
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| RevenueCat subscriptions | UI ready | Paywall screen built; SDK not yet integrated |
-| Apple Health (HealthKit) | Planned | `expo-health` when available |
-| Camera / AR scanning | Planned | Real LiDAR via `VisionCamera` or ARKit |
-| Push notifications | Planned | `expo-notifications` for scan reminders |
-| iCloud sync | Planned | For cross-device data backup |
+The Express API server (`artifacts/api-server`) handles AI analysis and runs alongside the Expo app.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/healthz` | Health check |
+| `POST` | `/api/scan/analyze` | AI body scan analysis |
+
+### `POST /api/scan/analyze`
+
+**Request body:**
+```json
+{
+  "frontImage": "<base64 JPEG>",
+  "sideImage": "<base64 JPEG — optional>",
+  "profile": {
+    "height": 178,
+    "weight": 82,
+    "age": 28,
+    "gender": "male",
+    "goal": "build_muscle"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "measurements": {
+    "chest": 97.2, "waist": 81.5, "hips": 96.1,
+    "leftArm": 36.4, "rightArm": 36.8,
+    "leftThigh": 58.9, "rightThigh": 59.2,
+    "neck": 38.5, "shoulders": 122.7,
+    "bodyFat": 16.3, "muscleMass": 43.1
+  },
+  "weight": 82,
+  "bmi": 25.9,
+  "score": 84,
+  "insights": ["Your waist-to-hip ratio improved...", "..."]
+}
+```
+
+The server uses GPT-4.1 Vision via the Replit AI Integrations proxy.
 
 ---
 
