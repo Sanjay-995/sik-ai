@@ -156,6 +156,7 @@ export default function CompareScreen() {
                 key={metric.label}
                 style={[
                   styles.tableRow,
+                  { backgroundColor: i % 2 === 0 ? colors.surface : 'transparent' },
                   i < COMPARE_METRICS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                 ]}
               >
