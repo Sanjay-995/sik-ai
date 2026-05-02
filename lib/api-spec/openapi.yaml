@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: scan
+    description: AI body scan operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /scan/analyze:
+    post:
+      operationId: analyzeScan
+      tags: [scan]
+      summary: Analyze body scan photo with AI
+      description: Accepts a front-view (and optional side-view) photo plus user profile, returns AI-estimated body measurements.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanAnalyzeRequest"
+      responses:
+        "200":
+          description: AI-generated scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -34,3 +67,110 @@ components:
       required:
         - status
 
+    UserProfile:
+      type: object
+      properties:
+        height:
+          type: number
+          description: Height in cm
+        weight:
+          type: number
+          description: Weight in kg
+        age:
+          type: integer
+        gender:
+          type: string
+          enum: [male, female]
+        goal:
+          type: string
+          enum: [lose_weight, build_muscle, maintain, improve_fitness]
+      required:
+        - height
+        - weight
+        - age
+        - gender
+
+    ScanAnalyzeRequest:
+      type: object
+      properties:
+        frontImage:
+          type: string
+          description: Base64-encoded front-view photo (JPEG/PNG, without data URI prefix)
+        sideImage:
+          type: string
+          description: Base64-encoded side-view photo (optional, without data URI prefix)
+        profile:
+          $ref: "#/components/schemas/UserProfile"
+      required:
+        - frontImage
+        - profile
+
+    BodyMeasurement:
+      type: object
+      properties:
+        chest:
+          type: number
+        waist:
+          type: number
+        hips:
+          type: number
+        leftArm:
+          type: number
+        rightArm:
+          type: number
+        leftThigh:
+          type: number
+        rightThigh:
+          type: number
+        neck:
+          type: number
+        shoulders:
+          type: number
+        bodyFat:
+          type: number
+        muscleMass:
+          type: number
+      required:
+        - chest
+        - waist
+        - hips
+        - leftArm
+        - rightArm
+        - leftThigh
+        - rightThigh
+        - neck
+        - shoulders
+        - bodyFat
+        - muscleMass
+
+    ScanResult:
+      type: object
+      properties:
+        measurements:
+          $ref: "#/components/schemas/BodyMeasurement"
+        weight:
+          type: number
+        bmi:
+          type: number
+        score:
+          type: integer
+        insights:
+          type: array
+          items:
+            type: string
+          description: Short AI-generated insights about the scan
+      required:
+        - measurements
+        - weight
+        - bmi
+        - score
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
