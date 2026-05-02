@@ -92,7 +92,7 @@ export default function PaywallScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} activeOpacity={0.7}>
             <Feather name="x" size={24} color={colors.foreground} />
           </TouchableOpacity>
         </View>
@@ -125,7 +125,7 @@ export default function PaywallScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
           <Feather name="x" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <View style={[styles.trialBadge, { backgroundColor: colors.emeraldGlow, borderColor: 'rgba(16,185,129,0.3)' }]}>
