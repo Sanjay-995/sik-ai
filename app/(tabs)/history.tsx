@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp, ScanRecord } from '@/context/AppContext';
+import { useUnits } from '@/hooks/useUnits';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -14,6 +15,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 function ScanItem({ scan, index }: { scan: ScanRecord; index: number }) {
   const colors = useColors();
+  const { convertLen, convertWt, lenUnit, wtUnit } = useUnits();
   const [expanded, setExpanded] = useState(false);
   const spinValue = React.useRef(new Animated.Value(0)).current;
   const date = new Date(scan.date);
@@ -43,17 +45,17 @@ function ScanItem({ scan, index }: { scan: ScanRecord; index: number }) {
   });
 
   const DETAIL_ROWS = [
-    { label: 'Chest', value: `${scan.measurements.chest.toFixed(1)} cm` },
-    { label: 'Waist', value: `${scan.measurements.waist.toFixed(1)} cm` },
-    { label: 'Hips', value: `${scan.measurements.hips.toFixed(1)} cm` },
-    { label: 'Shoulders', value: `${scan.measurements.shoulders.toFixed(1)} cm` },
-    { label: 'Left Arm', value: `${scan.measurements.leftArm.toFixed(1)} cm` },
-    { label: 'Right Arm', value: `${scan.measurements.rightArm.toFixed(1)} cm` },
-    { label: 'Left Thigh', value: `${scan.measurements.leftThigh.toFixed(1)} cm` },
-    { label: 'Right Thigh', value: `${scan.measurements.rightThigh.toFixed(1)} cm` },
-    { label: 'Neck', value: `${scan.measurements.neck.toFixed(1)} cm` },
+    { label: 'Chest', value: `${convertLen(scan.measurements.chest).toFixed(1)} ${lenUnit}` },
+    { label: 'Waist', value: `${convertLen(scan.measurements.waist).toFixed(1)} ${lenUnit}` },
+    { label: 'Hips', value: `${convertLen(scan.measurements.hips).toFixed(1)} ${lenUnit}` },
+    { label: 'Shoulders', value: `${convertLen(scan.measurements.shoulders).toFixed(1)} ${lenUnit}` },
+    { label: 'Left Arm', value: `${convertLen(scan.measurements.leftArm).toFixed(1)} ${lenUnit}` },
+    { label: 'Right Arm', value: `${convertLen(scan.measurements.rightArm).toFixed(1)} ${lenUnit}` },
+    { label: 'Left Thigh', value: `${convertLen(scan.measurements.leftThigh).toFixed(1)} ${lenUnit}` },
+    { label: 'Right Thigh', value: `${convertLen(scan.measurements.rightThigh).toFixed(1)} ${lenUnit}` },
+    { label: 'Neck', value: `${convertLen(scan.measurements.neck).toFixed(1)} ${lenUnit}` },
     { label: 'Body Fat', value: `${scan.measurements.bodyFat.toFixed(1)}%` },
-    { label: 'Muscle Mass', value: `${scan.measurements.muscleMass.toFixed(1)} kg` },
+    { label: 'Muscle Mass', value: `${convertWt(scan.measurements.muscleMass).toFixed(1)} ${wtUnit}` },
     { label: 'BMI', value: `${scan.bmi}` },
   ];
 
@@ -79,10 +81,10 @@ function ScanItem({ scan, index }: { scan: ScanRecord; index: number }) {
               )}
             </View>
             <Text style={[styles.scanSubtitle, { color: colors.textSecondary }]}>
-              {scan.weight}kg · {scan.measurements.bodyFat.toFixed(1)}% body fat
+              {convertWt(scan.weight).toFixed(1)}{wtUnit} · {scan.measurements.bodyFat.toFixed(1)}% body fat
             </Text>
             <Text style={[styles.scanSubtitle, { color: colors.textTertiary }]}>
-              Waist {scan.measurements.waist.toFixed(1)}cm · BMI {scan.bmi}
+              Waist {convertLen(scan.measurements.waist).toFixed(1)}{lenUnit} · BMI {scan.bmi}
             </Text>
           </View>
         </View>
@@ -122,6 +124,7 @@ export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { scanHistory } = useApp();
+  const { convertWt, wtUnit } = useUnits();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 + 84 : insets.bottom + 84;
@@ -143,7 +146,7 @@ export default function HistoryScreen() {
         <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryValue, { color: colors.emerald }]}>
-              {(scanHistory[0].weight - scanHistory[scanHistory.length - 1].weight).toFixed(1)}kg
+              {convertWt(scanHistory[0].weight - scanHistory[scanHistory.length - 1].weight).toFixed(1)}{wtUnit}
             </Text>
             <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Weight Change</Text>
           </View>
@@ -157,7 +160,7 @@ export default function HistoryScreen() {
           <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryValue, { color: colors.chartBlue }]}>
-              +{(scanHistory[0].measurements.muscleMass - scanHistory[scanHistory.length - 1].measurements.muscleMass).toFixed(1)}kg
+              +{convertWt(scanHistory[0].measurements.muscleMass - scanHistory[scanHistory.length - 1].measurements.muscleMass).toFixed(1)}{wtUnit}
             </Text>
             <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Muscle Gained</Text>
           </View>
