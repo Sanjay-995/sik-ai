@@ -168,27 +168,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function updateProfile(updates: Partial<UserProfile>) {
-    const updated = { ...profile, ...updates };
-    setProfile(updated);
-    await AsyncStorage.setItem('profile', JSON.stringify(updated));
+    try {
+      const updated = { ...profile, ...updates };
+      setProfile(updated);
+      await AsyncStorage.setItem('profile', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error updating profile:', e);
+    }
   }
 
   async function addScan(scan: ScanRecord) {
-    const updated = [scan, ...scanHistory];
-    setScanHistory(updated);
-    await AsyncStorage.setItem('scanHistory', JSON.stringify(updated));
+    try {
+      const updated = [scan, ...scanHistory];
+      setScanHistory(updated);
+      await AsyncStorage.setItem('scanHistory', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error adding scan:', e);
+    }
   }
 
   async function addChatMessage(msg: ChatMessage) {
-    const updated = [...chatMessagesRef.current, msg];
-    chatMessagesRef.current = updated;
-    setChatMessages(updated);
-    await AsyncStorage.setItem('chatMessages', JSON.stringify(updated));
+    try {
+      const updated = [...chatMessagesRef.current, msg];
+      chatMessagesRef.current = updated;
+      setChatMessages(updated);
+      await AsyncStorage.setItem('chatMessages', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error adding chat message:', e);
+    }
   }
 
   async function clearChat() {
-    setChatMessages([]);
-    await AsyncStorage.removeItem('chatMessages');
+    try {
+      setChatMessages([]);
+      await AsyncStorage.removeItem('chatMessages');
+    } catch (e) {
+      console.error('Error clearing chat:', e);
+    }
   }
 
   const latestScan = scanHistory.length > 0 ? scanHistory[0] : null;
