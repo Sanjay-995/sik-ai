@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp, ScanRecord } from '@/context/AppContext';
+import { useUnits } from '@/hooks/useUnits';
 
 const { width } = Dimensions.get('window');
 
@@ -79,6 +80,7 @@ export default function CompareScreen() {
     scanHistory.length > 1 ? scanHistory[0].id : null
   );
 
+  const { convertLen, convertWt, lenUnit, wtUnit } = useUnits();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
 
@@ -87,14 +89,14 @@ export default function CompareScreen() {
 
   const COMPARE_METRICS = [
     { label: 'Body Score', getA: (s: ScanRecord) => s.score, getB: (s: ScanRecord) => s.score, unit: 'pts', higherIsBetter: true },
-    { label: 'Weight', getA: (s: ScanRecord) => s.weight, getB: (s: ScanRecord) => s.weight, unit: 'kg', higherIsBetter: false },
+    { label: 'Weight', getA: (s: ScanRecord) => convertWt(s.weight), getB: (s: ScanRecord) => convertWt(s.weight), unit: wtUnit, higherIsBetter: false },
     { label: 'Body Fat', getA: (s: ScanRecord) => s.measurements.bodyFat, getB: (s: ScanRecord) => s.measurements.bodyFat, unit: '%', higherIsBetter: false },
-    { label: 'Muscle Mass', getA: (s: ScanRecord) => s.measurements.muscleMass, getB: (s: ScanRecord) => s.measurements.muscleMass, unit: 'kg', higherIsBetter: true },
-    { label: 'Chest', getA: (s: ScanRecord) => s.measurements.chest, getB: (s: ScanRecord) => s.measurements.chest, unit: 'cm', higherIsBetter: true },
-    { label: 'Waist', getA: (s: ScanRecord) => s.measurements.waist, getB: (s: ScanRecord) => s.measurements.waist, unit: 'cm', higherIsBetter: false },
-    { label: 'Hips', getA: (s: ScanRecord) => s.measurements.hips, getB: (s: ScanRecord) => s.measurements.hips, unit: 'cm', higherIsBetter: true },
-    { label: 'L. Arm', getA: (s: ScanRecord) => s.measurements.leftArm, getB: (s: ScanRecord) => s.measurements.leftArm, unit: 'cm', higherIsBetter: true },
-    { label: 'Shoulders', getA: (s: ScanRecord) => s.measurements.shoulders, getB: (s: ScanRecord) => s.measurements.shoulders, unit: 'cm', higherIsBetter: true },
+    { label: 'Muscle Mass', getA: (s: ScanRecord) => convertWt(s.measurements.muscleMass), getB: (s: ScanRecord) => convertWt(s.measurements.muscleMass), unit: wtUnit, higherIsBetter: true },
+    { label: 'Chest', getA: (s: ScanRecord) => convertLen(s.measurements.chest), getB: (s: ScanRecord) => convertLen(s.measurements.chest), unit: lenUnit, higherIsBetter: true },
+    { label: 'Waist', getA: (s: ScanRecord) => convertLen(s.measurements.waist), getB: (s: ScanRecord) => convertLen(s.measurements.waist), unit: lenUnit, higherIsBetter: false },
+    { label: 'Hips', getA: (s: ScanRecord) => convertLen(s.measurements.hips), getB: (s: ScanRecord) => convertLen(s.measurements.hips), unit: lenUnit, higherIsBetter: true },
+    { label: 'L. Arm', getA: (s: ScanRecord) => convertLen(s.measurements.leftArm), getB: (s: ScanRecord) => convertLen(s.measurements.leftArm), unit: lenUnit, higherIsBetter: true },
+    { label: 'Shoulders', getA: (s: ScanRecord) => convertLen(s.measurements.shoulders), getB: (s: ScanRecord) => convertLen(s.measurements.shoulders), unit: lenUnit, higherIsBetter: true },
     { label: 'BMI', getA: (s: ScanRecord) => s.bmi, getB: (s: ScanRecord) => s.bmi, unit: '', higherIsBetter: false },
   ];
 
