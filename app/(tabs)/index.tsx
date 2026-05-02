@@ -54,6 +54,7 @@ export default function DashboardScreen() {
         <TouchableOpacity
           style={[styles.proBtn, { backgroundColor: profile.isPro ? colors.emeraldGlow : colors.card, borderColor: profile.isPro ? 'rgba(16,185,129,0.4)' : colors.border }]}
           onPress={() => router.push('/paywall')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Feather name="zap" size={14} color={profile.isPro ? colors.emerald : colors.textSecondary} />
           <Text style={[styles.proBtnText, { color: profile.isPro ? colors.emerald : colors.textSecondary }]}>
@@ -74,7 +75,11 @@ export default function DashboardScreen() {
               />
             ) : (
               <View style={styles.noScanPlaceholder}>
-                <Feather name="user" size={48} color={colors.border} />
+                <View style={[styles.noScanIconCircle, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Feather name="user" size={36} color={colors.textTertiary} />
+                </View>
+                <Text style={[styles.noScanTitle, { color: colors.foreground }]}>No scan yet</Text>
+                <Text style={[styles.noScanSubtitle, { color: colors.textSecondary }]}>Take your first body scan to see measurements here</Text>
               </View>
             )}
           </View>
@@ -91,6 +96,7 @@ export default function DashboardScreen() {
                 <TouchableOpacity
                   style={[styles.newScanBtn, { backgroundColor: colors.emerald }]}
                   onPress={() => router.push('/(tabs)/scan')}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Feather name="camera" size={14} color="#fff" />
                   <Text style={styles.newScanBtnText}>New Scan</Text>
@@ -108,10 +114,12 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Measurement hint */}
-        <Text style={[styles.tapHint, { color: colors.textTertiary }]}>
-          Tap body zones to see measurements
-        </Text>
+        {/* Measurement hint — only when there is scan data */}
+        {latestScan && (
+          <Text style={[styles.tapHint, { color: colors.textTertiary }]}>
+            Tap body zones to see measurements
+          </Text>
+        )}
       </View>
 
       {/* Key Metrics */}
@@ -196,6 +204,7 @@ export default function DashboardScreen() {
               key={action.label}
               style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() => router.push(action.route as any)}
+              activeOpacity={0.7}
             >
               <Feather name={action.icon as any} size={22} color={colors.emerald} />
               <Text style={[styles.actionLabel, { color: colors.foreground }]}>{action.label}</Text>
@@ -245,7 +254,20 @@ const styles = StyleSheet.create({
     height: 260,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
   },
+  noScanIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  noScanTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  noScanSubtitle: { fontSize: 12, textAlign: 'center', lineHeight: 18 },
   scoreColumn: {
     alignItems: 'center',
     gap: 10,
